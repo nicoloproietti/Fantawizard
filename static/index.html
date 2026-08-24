@@ -1347,14 +1347,32 @@ function computeInflation(purchases, playerMap, seasonMap) {
   return inflation;
 }
 
-function computeReliability(lastSeasonApps, maxApps) {
+function computeReliability(lastSeasonApps, maxApps, starterPct) {
   if (maxApps < 1 || lastSeasonApps < 1) return 0;
-  const ratio = lastSeasonApps / maxApps;
-  return Math.min(1.0, Math.max(0.05, ratio / 0.75));
+  const appRatio = lastSeasonApps / maxApps;
+  let base = Math.min(1.0, Math.max(0.05, appRatio / 0.75));
+  if (starterPct > 0) {
+    const sp = starterPct / 100;
+    base = base * (0.7 + 0.3 * sp);
+  }
+  return Math.min(1.0, Math.max(0.05, base));
 }
 
-function getPlayerStatus(lastApps, maxApps) {
+function getStarterPct(seasons) {
+  if (!seasons.length) return 0;
+  const s = seasons[0];
+  if (s.starter_pct > 0) return s.starter_pct;
+  if (s.minutes && s.appearances > 0) return Math.min(100, Math.round((s.minutes / s.appearances) / 90 * 100));
+  return 0;
+}
+
+function getPlayerStatus(lastApps, maxApps, starterPct) {
   if (maxApps < 1) return {label:'N/D', cls:'status-nd'};
+  if (starterPct >= 70) return {label:'Titolare', cls:'status-tit'};
+  if (starterPct >= 40) return {label:'Semi-tit.', cls:'status-semi'};
+  if (starterPct > 0 && starterPct < 40) {
+    return lastApps >= maxApps * 0.13 ? {label:'Rotazione', cls:'status-rot'} : {label:'Riserva', cls:'status-ris'};
+  }
   const ratio = lastApps / maxApps;
   if (ratio >= 0.75) return {label:'Titolare', cls:'status-tit'};
   if (ratio >= 0.40) return {label:'Semi-tit.', cls:'status-semi'};
@@ -1378,8 +1396,9 @@ function computeTiers(players, seasonMap) {
     const ss = seasonMap[pl.id] || [];
     const fma = projectFMA(pl, ss);
     const lastApps = ss.length > 0 ? (ss[0].appearances || 0) : 0;
+    const starterPct = getStarterPct(ss);
     if (!byRole[pl.role_classic]) byRole[pl.role_classic] = [];
-    byRole[pl.role_classic].push({...pl, fma, lastApps});
+    byRole[pl.role_classic].push({...pl, fma, lastApps, starterPct});
     const trKey = `${pl.team}_${pl.role_classic}`;
     if (!byTeamRole[trKey]) byTeamRole[trKey] = [];
     byTeamRole[trKey].push(pl);
@@ -1396,7 +1415,7 @@ function computeTiers(players, seasonMap) {
     for (const p of items) {
       const trKey = `${p.team}_${role}`;
       const maxApps = teamRoleMax[trKey] || 0;
-      const baseRel = computeReliability(p.lastApps, maxApps);
+      const baseRel = computeReliability(p.lastApps, maxApps, p.starterPct);
       if (baseRel === 0) {
         const est = estimateStarterRole(p, byTeamRole[trKey] || []);
         p.reliability = est.reliability;
@@ -1404,7 +1423,7 @@ function computeTiers(players, seasonMap) {
         p.projected = true;
       } else {
         p.reliability = baseRel;
-        p.status = getPlayerStatus(p.lastApps, maxApps);
+        p.status = getPlayerStatus(p.lastApps, maxApps, p.starterPct);
         p.projected = false;
       }
       p.adjFma = Math.round(p.fma * p.reliability * 100) / 100;
