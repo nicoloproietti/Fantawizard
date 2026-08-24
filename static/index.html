@@ -1670,8 +1670,9 @@ function autoFillPlan() {
       if (targetList[role].length >= count) break;
       const remaining = roleBudget - spent;
       const slotsLeft = count - targetList[role].length;
-      const maxForThis = remaining - (slotsLeft - 1);
-      const maxPrice = Math.max(1, Math.min(Math.round(s.rec * 1.15), maxForThis));
+      const budgetForRest = slotsLeft - 1;
+      if (s.rec > remaining - budgetForRest) continue;
+      const maxPrice = Math.max(s.rec, Math.min(Math.round(s.rec * 1.15), remaining - budgetForRest));
       targetList[role].push({playerId: s.playerId, maxPrice});
       spent += maxPrice;
     }
