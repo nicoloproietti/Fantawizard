@@ -844,6 +844,7 @@ a { color: var(--accent2); text-decoration: none; }
       <button class="btn-ghost btn-sm" onclick="clearPlan()">Svuota</button>
     </div>
   </div>
+  <div id="plan-budget-splits" class="card" style="margin-bottom:16px;"></div>
   <div id="plan-budget-summary" class="card" style="margin-bottom:20px;"></div>
   <div id="plan-roles"></div>
 </div>
@@ -1560,13 +1561,18 @@ function getPlanKey() {
 function loadPlan() {
   try {
     const raw = localStorage.getItem(getPlanKey());
-    if (raw) { targetList = JSON.parse(raw); return; }
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data.targets) { targetList = data.targets; budgetSplits = data.splits || {}; }
+      else { targetList = data; }
+      return;
+    }
   } catch(e) {}
   targetList = {};
 }
 
 function savePlan() {
-  try { localStorage.setItem(getPlanKey(), JSON.stringify(targetList)); } catch(e) {}
+  try { localStorage.setItem(getPlanKey(), JSON.stringify({targets: targetList, splits: budgetSplits})); } catch(e) {}
 }
 
 function addTarget(role, playerId, maxPrice) {
@@ -1589,6 +1595,41 @@ function updateTargetPrice(role, playerId, maxPrice) {
   savePlan();
 }
 
+function renderBudgetSplits() {
+  const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
+  const total = Object.values(splits).reduce((a,b)=>a+b, 0);
+  const credits = getActiveCredits();
+  const roleLabels = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
+  const totClr = total === 100 ? 'var(--green)' : 'var(--red)';
+  let html = `<div style="font-size:.82rem;color:var(--text2);margin-bottom:10px;">Budget per ruolo <span style="font-size:.72rem;">(totale: <strong id="split-total" style="color:${totClr}">${total}%</strong>)</span></div>`;
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">`;
+  for (const role of ['P','D','C','A']) {
+    const pct = splits[role] || 0;
+    const allocated = Math.round(credits * pct / 100);
+    html += `<div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-weight:700;color:var(--accent);min-width:18px;">${role}</span>
+      <input type="range" min="0" max="60" value="${pct}" style="flex:1;accent-color:var(--accent);" oninput="updateBudgetSplit('${role}',this.value)">
+      <span style="min-width:70px;font-size:.8rem;font-variant-numeric:tabular-nums;" id="split-val-${role}">${pct}% (${allocated}cr)</span>
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById('plan-budget-splits').innerHTML = html;
+}
+
+function updateBudgetSplit(role, val) {
+  const splits = Object.keys(budgetSplits).length ? budgetSplits : {...DEFAULT_BUDGET};
+  splits[role] = parseInt(val);
+  budgetSplits = splits;
+  const total = Object.values(splits).reduce((a,b)=>a+b, 0);
+  const credits = getActiveCredits();
+  const allocated = Math.round(credits * parseInt(val) / 100);
+  document.getElementById('split-val-' + role).textContent = `${val}% (${allocated}cr)`;
+  const totalEl = document.getElementById('split-total');
+  if (totalEl) { totalEl.textContent = total + '%'; totalEl.style.color = total === 100 ? 'var(--green)' : 'var(--red)'; }
+  savePlan();
+  renderPlanBody();
+}
+
 function autoFillPlan() {
   if (!allPlayers.length) { toast('Carica prima i dati nella sezione Dati'); return; }
   if (!Object.keys(bonusMap).length) {
@@ -1600,10 +1641,13 @@ function autoFillPlan() {
   const numTeams = auctionData?.num_teams || 10;
   const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
   const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
+  const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
   targetList = {};
 
   for (const [role, count] of Object.entries(roles)) {
     if (!count) continue;
+    const budgetPct = (splits[role] || 0) / 100;
+    const roleBudget = Math.round(credits * budgetPct);
     const rolePlayers = allPlayers.filter(p => p.role_classic === role && !soldIds.has(p.id));
     const scored = rolePlayers.map(pl => {
       const ss = seasonMap[pl.id] || [];
@@ -1616,23 +1660,19 @@ function autoFillPlan() {
       const scarcity = computeScarcity(tier, rt);
       const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
       const rec = recommendedPrice(bp, role, tier, {}, scarcity, 999, mkt);
-      return {playerId: pl.id, adjFma, rec};
+      return {playerId: pl.id, adjFma, rec: Math.max(rec, 1)};
     });
     scored.sort((a,b) => b.adjFma - a.adjFma);
-    const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
-    const budgetPct = (splits[role] || 25) / 100;
-    const roleBudget = credits * budgetPct;
     let spent = 0;
     targetList[role] = [];
     for (const s of scored) {
       if (targetList[role].length >= count) break;
-      const maxP = Math.round(s.rec * 1.2);
-      if (spent + s.rec > roleBudget && targetList[role].length > 0) {
-        targetList[role].push({playerId: s.playerId, maxPrice: Math.min(maxP, Math.round((roleBudget - spent) * 0.9))});
-      } else {
-        targetList[role].push({playerId: s.playerId, maxPrice: maxP});
-      }
-      spent += s.rec;
+      const remaining = roleBudget - spent;
+      const slotsLeft = count - targetList[role].length;
+      const maxForThis = remaining - (slotsLeft - 1);
+      const maxPrice = Math.max(1, Math.min(Math.round(s.rec * 1.15), maxForThis));
+      targetList[role].push({playerId: s.playerId, maxPrice});
+      spent += maxPrice;
     }
   }
   savePlan();
@@ -1642,12 +1682,12 @@ function autoFillPlan() {
 
 function clearPlan() {
   targetList = {};
+  budgetSplits = {};
   savePlan();
   renderPlan();
 }
 
-function renderPlan() {
-  loadPlan();
+function renderPlanBody() {
   if (!Object.keys(bonusMap).length) {
     for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
   }
@@ -1778,9 +1818,15 @@ function renderPlan() {
   document.querySelectorAll('.plan-max-price').forEach(inp => {
     inp.addEventListener('change', () => {
       updateTargetPrice(inp.dataset.role, parseInt(inp.dataset.pid), parseInt(inp.value) || 0);
-      renderPlan();
+      renderPlanBody();
     });
   });
+}
+
+function renderPlan() {
+  loadPlan();
+  renderBudgetSplits();
+  renderPlanBody();
 }
 
 function openSlotSearch(role, idx) {
