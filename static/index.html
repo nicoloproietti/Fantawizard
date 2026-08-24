@@ -1320,13 +1320,59 @@ function computeBonusPerMatch(seasons) {
   return items;
 }
 
+// League-calibrated pricing: each player's analytical price is his value above
+// the best freely-available replacement, scaled so that the sum of prices of all
+// rosterable players equals the real money in the league (numTeams * credits).
+const PRICE_ALPHA = 1.3; // >1: auction prices grow superlinearly with value (star premium)
+let _priceCalib = null;
+
+function ensurePriceCalib(credits, numTeams) {
+  const rolesConf = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
+  const key = [credits, numTeams, JSON.stringify(rolesConf), allPlayers.length, allSeasons.length,
+    JSON.stringify(bonusMap), JSON.stringify(modFlags)].join('|');
+  if (_priceCalib && _priceCalib.key === key) return _priceCalib;
+
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const roleData = {};
+  let fvmTotal = 0;
+  for (const role of ['P','D','C','A']) {
+    const rt = tierData[role] || {};
+    const items = [];
+    for (const t of [1,2,3,4]) for (const p of (rt[t]||[])) items.push(p);
+    items.sort((a,b) => b.adjFma - a.adjFma);
+    const nRoster = Math.max(1, numTeams * (rolesConf[role] || 0));
+    const pool = items.slice(0, nRoster);
+    const fvmSum = pool.reduce((a,p) => a + (p.avg_auction_price || 0), 0);
+    roleData[role] = {pool, nRoster, fvmSum};
+    fvmTotal += fvmSum;
+  }
+  const calib = {key, roles:{}};
+  for (const role of ['P','D','C','A']) {
+    const {pool, nRoster, fvmSum} = roleData[role];
+    const share = fvmTotal > 0 ? fvmSum / fvmTotal : (DEFAULT_BUDGET[role] || 25) / 100;
+    const repl = pool.length ? pool[pool.length - 1].adjFma : 0;
+    let sumV = 0;
+    for (const p of pool) sumV += Math.pow(Math.max(0, p.adjFma - repl), PRICE_ALPHA);
+    const moneyPool = Math.max(0, numTeams * credits * share - nRoster);
+    calib.roles[role] = {repl, sumV, moneyPool};
+  }
+  // Normalize the market component too: FVM values are on their own scale, so
+  // rescale them so that rosterable market prices also sum to the league money.
+  const scaledFvmTotal = fvmTotal * credits / FVM_REF_CREDITS;
+  calib.mktScale = scaledFvmTotal > 0
+    ? Math.min(3, Math.max(0.3, (numTeams * credits) / scaledFvmTotal)) : 1;
+  _priceCalib = calib;
+  return calib;
+}
+
 function basePrice(fma, role, initialCredits, numTeams, totalSlots) {
   if (fma <= 0) return 1;
-  const pool = initialCredits * numTeams;
-  const perSlot = pool / Math.max(totalSlots * numTeams, 1);
-  const rw = {P:0.6, D:0.8, C:1.0, A:1.3}[role] || 1;
-  const raw = Math.pow(Math.max(0, fma - 4.5), 1.8) * rw * perSlot * 0.35;
-  return Math.max(1, Math.round(raw));
+  const c = ensurePriceCalib(initialCredits, numTeams);
+  const rc = c.roles[role];
+  if (!rc || rc.sumV <= 0 || rc.moneyPool <= 0) return 1;
+  const vorp = Math.max(0, fma - rc.repl);
+  return Math.max(1, Math.round(1 + rc.moneyPool * Math.pow(vorp, PRICE_ALPHA) / rc.sumV));
 }
 
 function computeInflation(purchases, playerMap, seasonMap) {
@@ -2652,8 +2698,9 @@ function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPri
   const analytical = bp * infl * scarcity;
   let raw;
   if (marketPrice && marketPrice > 0) {
-    raw = analytical * 0.55 + marketPrice * 0.45;
-    raw = Math.max(raw, marketPrice * 0.6);
+    const mktN = marketPrice * (_priceCalib?.mktScale || 1);
+    raw = analytical * 0.55 + mktN * 0.45;
+    raw = Math.max(raw, mktN * 0.6);
   } else {
     raw = analytical;
   }
