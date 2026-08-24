@@ -1367,7 +1367,7 @@ function ensurePriceCalib(credits, numTeams) {
 }
 
 function basePrice(fma, role, initialCredits, numTeams, totalSlots) {
-  if (fma <= 0) return 1;
+  if (!(fma > 0)) return 1;
   const c = ensurePriceCalib(initialCredits, numTeams);
   const rc = c.roles[role];
   if (!rc || rc.sumV <= 0 || rc.moneyPool <= 0) return 1;
@@ -2704,7 +2704,8 @@ function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPri
   } else {
     raw = analytical;
   }
-  return Math.max(1, Math.min(Math.round(raw), maxBid || 999));
+  const out = Math.max(1, Math.min(Math.round(raw), maxBid || 999));
+  return isFinite(out) ? out : 1;
 }
 
 // ── Data loading ──
