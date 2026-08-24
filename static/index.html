@@ -1547,14 +1547,19 @@ function updateTargetPrice(role, playerId, maxPrice) {
 }
 
 function autoFillPlan() {
+  if (!allPlayers.length) { toast('Carica prima i dati nella sezione Dati'); return; }
+  if (!Object.keys(bonusMap).length) {
+    for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
+  }
   const seasonMap = buildSeasonMap();
   const tierData = computeTiers(allPlayers, seasonMap);
   const credits = getActiveCredits();
   const numTeams = auctionData?.num_teams || 10;
-  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
+  const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
   targetList = {};
 
-  for (const [role, count] of Object.entries(rosterSlots)) {
+  for (const [role, count] of Object.entries(roles)) {
     if (!count) continue;
     const rolePlayers = allPlayers.filter(p => p.role_classic === role && !soldIds.has(p.id));
     const scored = rolePlayers.map(pl => {
@@ -1571,7 +1576,8 @@ function autoFillPlan() {
       return {playerId: pl.id, adjFma, rec};
     });
     scored.sort((a,b) => b.adjFma - a.adjFma);
-    const budgetPct = (budgetSplits[role] || 25) / 100;
+    const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
+    const budgetPct = (splits[role] || 25) / 100;
     const roleBudget = credits * budgetPct;
     let spent = 0;
     targetList[role] = [];
@@ -1599,12 +1605,22 @@ function clearPlan() {
 
 function renderPlan() {
   loadPlan();
+  if (!Object.keys(bonusMap).length) {
+    for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
+  }
   const seasonMap = buildSeasonMap();
   const tierData = computeTiers(allPlayers, seasonMap);
   const credits = getActiveCredits();
   const numTeams = auctionData?.num_teams || 10;
-  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
-  const roles = Object.keys(rosterSlots).length ? rosterSlots : {P:3,D:8,C:8,A:6};
+  const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
+  const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
+  const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
+
+  if (!allPlayers.length) {
+    document.getElementById('plan-budget-summary').innerHTML = '<div style="color:var(--text2);text-align:center;padding:20px;">Carica prima i dati nella sezione Dati</div>';
+    document.getElementById('plan-roles').innerHTML = '';
+    return;
+  }
 
   // Budget summary
   let budgetHtml = '<div style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">Budget pianificato per ruolo</div>';
@@ -1613,7 +1629,7 @@ function renderPlan() {
     const tgts = targetList[role] || [];
     const planned = tgts.reduce((a,t) => a + (t.maxPrice || 0), 0);
     totalPlanned += planned;
-    const budgetPct = (budgetSplits[role] || 25) / 100;
+    const budgetPct = (splits[role] || 25) / 100;
     const allocated = Math.round(credits * budgetPct);
     const fillPct = allocated > 0 ? Math.min(planned / allocated * 100, 100) : 0;
     const clr = fillPct > 100 ? 'var(--red)' : fillPct > 80 ? 'var(--yellow)' : 'var(--green)';
@@ -1744,7 +1760,8 @@ function planSearch(role, q) {
   const tierData = computeTiers(allPlayers, seasonMap);
   const credits = getActiveCredits();
   const numTeams = auctionData?.num_teams || 10;
-  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
+  const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
 
   el.innerHTML = results.map(pl => {
     const ss = seasonMap[pl.id] || [];
