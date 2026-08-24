@@ -89,6 +89,7 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .sidebar nav button:hover { color: var(--text); background: var(--bg3); }
 .sidebar nav button.active { color: var(--accent); background: var(--accent-dim); }
+.sidebar nav button.nav-disabled { opacity:.35; pointer-events:none; }
 .sidebar nav button .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
 .sidebar-overlay {
   position: fixed; inset:0; background:rgba(0,0,0,.5); z-index:110; display:none;
@@ -110,6 +111,10 @@ a { color: var(--accent2); text-decoration: none; }
 .hamburger svg { width:22px; height:22px; }
 .topbar-title {
   font-size:.88rem; font-weight:600; color:var(--text2);
+}
+#auction-indicator { overflow:hidden; white-space:nowrap; font-size:.8rem; }
+@media(max-width:600px) {
+  #auction-indicator span:not(:first-child):not(:last-child) { display:none; }
 }
 
 .view { display:none; padding: 28px 0; }
@@ -664,12 +669,12 @@ a { color: var(--accent2); text-decoration: none; }
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">FantaWizard</div>
   <nav id="nav">
-    <button data-view="dashboard" class="active"><span class="nav-icon">&#9889;</span>Asta Live</button>
-    <button data-view="plan"><span class="nav-icon">&#127919;</span>Piano Asta</button>
+    <button data-view="dashboard" data-needs-auction="1"><span class="nav-icon">&#9889;</span>Asta Live</button>
+    <button data-view="plan" data-needs-auction="1"><span class="nav-icon">&#127919;</span>Piano Asta</button>
     <button data-view="players"><span class="nav-icon">&#9917;</span>Giocatori</button>
-    <button data-view="tiers"><span class="nav-icon">&#9776;</span>Tier List</button>
-    <button data-view="teams"><span class="nav-icon">&#128101;</span>Rose</button>
-    <button data-view="data"><span class="nav-icon">&#128194;</span>Dati</button>
+    <button data-view="tiers" class="active"><span class="nav-icon">&#9776;</span>Tier List</button>
+    <button data-view="teams" data-needs-auction="1"><span class="nav-icon">&#128101;</span>Rose</button>
+    <button data-view="data" data-needs-auction="1"><span class="nav-icon">&#128194;</span>Dati</button>
     <button data-view="setup"><span class="nav-icon">&#9881;</span>Setup</button>
   </nav>
 </aside>
@@ -677,7 +682,8 @@ a { color: var(--accent2); text-decoration: none; }
   <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
-  <span class="topbar-title" id="topbar-title">Asta Live</span>
+  <span class="topbar-title" id="topbar-title">Tier List</span>
+  <div id="auction-indicator" style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.82rem;"></div>
 </div>
 
 <div id="view-setup" class="view">
@@ -770,7 +776,7 @@ a { color: var(--accent2); text-decoration: none; }
 </div>
 </div>
 
-<div id="view-dashboard" class="view active">
+<div id="view-dashboard" class="view">
 <div class="container">
   <div style="display:flex;gap:10px;align-items:stretch;margin-bottom:16px;">
     <div class="search-box" style="flex:1;">
@@ -878,7 +884,7 @@ a { color: var(--accent2); text-decoration: none; }
 </div>
 </div>
 
-<div id="view-tiers" class="view">
+<div id="view-tiers" class="view active">
 <div class="container">
   <div class="tier-filter-bar" id="tier-filter-bar">
     <button onclick="showTierRole('P')" data-role="P">Portieri</button>
@@ -941,12 +947,65 @@ function toast(msg) {
 
 // ── Navigation ──
 const VIEW_TITLES = {dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
+const AUCTION_VIEWS = ['dashboard','plan','teams','data'];
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebar-overlay').classList.toggle('open');
 }
+
+function updateNavState() {
+  const hasAuction = !!currentAuction;
+  document.querySelectorAll('#nav button[data-needs-auction]').forEach(btn => {
+    btn.classList.toggle('nav-disabled', !hasAuction);
+  });
+  if (!hasAuction) {
+    const activeBtn = document.querySelector('#nav button.active');
+    if (activeBtn && activeBtn.dataset.needsAuction) {
+      navigateTo('tiers');
+    }
+  }
+  renderAuctionIndicator();
+}
+
+function navigateTo(view) {
+  const btn = document.querySelector(`#nav button[data-view="${view}"]`);
+  if (btn && !btn.classList.contains('nav-disabled')) btn.click();
+}
+
+let allAuctionsCache = [];
+function renderAuctionIndicator() {
+  const el = document.getElementById('auction-indicator');
+  if (!el) return;
+  if (!currentAuction) {
+    el.innerHTML = `<span style="color:var(--text3);">Nessuna asta attiva</span>
+      <button class="btn btn-sm" style="font-size:.75rem;padding:3px 10px;" onclick="navigateTo('setup')">Crea / Apri</button>`;
+    return;
+  }
+  const name = auctionData ? auctionData.name : `Asta #${currentAuction}`;
+  const credits = auctionData ? auctionData.initial_credits : '?';
+  const nTeams = auctionData ? auctionData.num_teams : '?';
+  el.innerHTML = `<span style="color:var(--accent);font-weight:700;">${name}</span>
+    <span style="color:var(--text3);font-size:.75rem;">${nTeams}sq · ${credits}cr</span>
+    <button class="btn-ghost btn-sm" style="font-size:.72rem;padding:2px 8px;" onclick="closeAuction()">Chiudi</button>`;
+}
+
+function closeAuction() {
+  currentAuction = null;
+  auctionData = null;
+  teamsCache = [];
+  soldIds = new Set();
+  userSoldIds = new Set();
+  bonusMap = {};
+  modFlags = {};
+  rosterSlots = {};
+  document.getElementById('strategy-section').style.display = 'none';
+  updateNavState();
+  toast('Asta chiusa');
+}
+
 document.querySelectorAll('#nav button').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (btn.classList.contains('nav-disabled')) return;
     document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
@@ -2088,16 +2147,22 @@ function renderTeamNames() {
 
 async function loadExistingAuctions() {
   const {data} = await sb.from('auctions').select('*').order('created_at', {ascending: false});
+  allAuctionsCache = data || [];
   const el = document.getElementById('existing-auctions');
-  if (!data || !data.length) { el.innerHTML = ''; return; }
+  if (!data || !data.length) { el.innerHTML = '<p style="color:var(--text3);margin-top:16px;">Nessuna asta creata. Compila il form sopra per iniziare.</p>'; return; }
   el.innerHTML = '<h2 style="margin-bottom:12px;">Aste esistenti</h2>' +
-    data.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;">
-      <div><strong>${a.name}</strong><span style="color:var(--text2);font-size:.82rem;margin-left:10px;">${a.num_teams} squadre · ${a.initial_credits} crediti</span></div>
+    data.map(a => {
+      const isActive = currentAuction === a.id;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:${isActive?'var(--accent-dim)':'var(--bg3)'};border:1px solid ${isActive?'var(--accent)':'var(--border)'};border-radius:var(--radius);margin-bottom:8px;">
+      <div><strong>${a.name}</strong>${isActive?'<span style="font-size:.7rem;font-weight:700;color:var(--accent);margin-left:8px;">ATTIVA</span>':''}<span style="color:var(--text2);font-size:.82rem;margin-left:10px;">${a.num_teams} squadre · ${a.initial_credits} crediti · ${a.mode}</span></div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-sm" onclick="loadAuction(${a.id})">Apri</button>
+        ${isActive
+          ? '<button class="btn btn-sm" style="background:var(--text3);" onclick="closeAuction();loadExistingAuctions();">Chiudi</button>'
+          : `<button class="btn btn-sm" onclick="loadAuction(${a.id})">Apri</button>`}
         <button class="btn btn-sm btn-danger" onclick="deleteAuction(${a.id}, '${a.name.replace(/'/g,"\\'")}')">Elimina</button>
       </div>
-    </div>`).join('');
+    </div>`;
+    }).join('');
 }
 
 async function deleteAuction(id, name) {
@@ -2112,7 +2177,14 @@ async function deleteAuction(id, name) {
     sb.from('roster_slots').delete().eq('auction_id', id),
   ]);
   await sb.from('auctions').delete().eq('id', id);
-  if (currentAuction === id) { currentAuction = null; auctionData = null; }
+  if (currentAuction === id) {
+    currentAuction = null;
+    auctionData = null;
+    teamsCache = [];
+    soldIds = new Set();
+    userSoldIds = new Set();
+    updateNavState();
+  }
   toast('Asta eliminata');
   loadExistingAuctions();
 }
@@ -2194,7 +2266,10 @@ async function loadAuction(id) {
   await loadAllData();
   await loadAuctionPurchases();
   loadPlan();
-  document.querySelector('[data-view="dashboard"]').click();
+  document.getElementById('strategy-section').style.display = '';
+  updateNavState();
+  loadExistingAuctions();
+  navigateTo('dashboard');
 }
 
 // ── Dashboard ──
@@ -3131,8 +3206,7 @@ document.addEventListener('keydown', (e) => {
 renderSetup();
 loadExistingAuctions();
 loadAllData();
-loadPlan();
-if (!currentAuction) document.getElementById('strategy-section').style.display = 'none';
+updateNavState();
 </script>
 </body>
 </html>
