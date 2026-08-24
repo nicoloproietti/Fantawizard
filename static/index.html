@@ -586,6 +586,70 @@ a { color: var(--accent2); text-decoration: none; }
 .strat-badge.warn { background:rgba(255,215,64,.12); color:var(--yellow); }
 .suggest-card { background:var(--accent-dim); border:1px solid var(--accent); border-radius:var(--radius); padding:14px; margin-top:12px; }
 .suggest-card h3 { font-size:.72rem; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+
+/* ── Plan View ── */
+.plan-role-section { margin-bottom:24px; }
+.plan-role-header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 16px; background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--radius) var(--radius) 0 0; cursor:pointer;
+}
+.plan-role-header h3 { font-size:.88rem; font-weight:700; margin:0; }
+.plan-role-header .plan-role-meta { font-size:.78rem; color:var(--text2); display:flex; gap:12px; align-items:center; }
+.plan-role-body { border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); background:var(--bg2); }
+.plan-slot {
+  display:flex; align-items:center; gap:12px; padding:10px 16px;
+  border-bottom:1px solid var(--border); font-size:.84rem;
+}
+.plan-slot:last-child { border-bottom:none; }
+.plan-slot-num { width:24px; height:24px; border-radius:50%; background:var(--bg3); color:var(--text3); font-size:.7rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.plan-slot-player { flex:1; min-width:0; }
+.plan-slot-player .plan-name { font-weight:700; }
+.plan-slot-player .plan-meta { font-size:.72rem; color:var(--text2); margin-top:1px; }
+.plan-slot-prices { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+.plan-slot-prices .plan-price { font-weight:700; font-variant-numeric:tabular-nums; }
+.plan-slot-actions { display:flex; gap:4px; flex-shrink:0; }
+.plan-slot-actions button {
+  background:var(--bg3); border:1px solid var(--border2); color:var(--text2);
+  width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:.8rem;
+  display:flex; align-items:center; justify-content:center; transition:all .12s;
+}
+.plan-slot-actions button:hover { color:var(--text); border-color:var(--accent); }
+.plan-empty-slot {
+  display:flex; align-items:center; gap:8px; padding:10px 16px;
+  border-bottom:1px solid var(--border); font-size:.82rem; color:var(--text3); cursor:pointer; transition:background .12s;
+}
+.plan-empty-slot:hover { background:var(--bg3); color:var(--text2); }
+.plan-empty-slot:last-child { border-bottom:none; }
+.plan-search-inline {
+  width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2);
+  padding:8px 12px; border-radius:var(--radius-sm); font-family:var(--font); font-size:.84rem;
+  outline:none; transition:border-color .15s;
+}
+.plan-search-inline:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+.plan-search-results {
+  max-height:200px; overflow-y:auto; background:var(--bg3); border:1px solid var(--border2);
+  border-top:none; border-radius:0 0 var(--radius-sm) var(--radius-sm);
+}
+.plan-sr-item {
+  padding:8px 12px; cursor:pointer; display:flex; justify-content:space-between;
+  align-items:center; font-size:.82rem; border-bottom:1px solid var(--border); transition:background .1s;
+}
+.plan-sr-item:hover { background:var(--bg4); }
+.plan-sr-item:last-child { border-bottom:none; }
+.plan-alts { padding:4px 16px 8px 52px; }
+.plan-alts-label { font-size:.68rem; color:var(--text3); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
+.plan-alt-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:4px 8px; font-size:.78rem; color:var(--text2); border-radius:var(--radius-sm);
+  cursor:pointer; transition:background .1s;
+}
+.plan-alt-item:hover { background:var(--bg3); color:var(--text); }
+.plan-budget-bar { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.plan-budget-bar .pbb-role { width:22px; font-weight:800; color:var(--accent); font-size:.82rem; }
+.plan-budget-bar .pbb-bar { flex:1; height:16px; background:var(--bg3); border-radius:8px; overflow:hidden; border:1px solid var(--border); position:relative; }
+.plan-budget-bar .pbb-fill { height:100%; border-radius:8px; transition:width .3s; }
+.plan-budget-bar .pbb-nums { width:130px; text-align:right; font-size:.78rem; color:var(--text2); font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
@@ -595,6 +659,7 @@ a { color: var(--accent2); text-decoration: none; }
   <div class="sidebar-brand">FantaWizard</div>
   <nav id="nav">
     <button data-view="dashboard" class="active"><span class="nav-icon">&#9889;</span>Asta Live</button>
+    <button data-view="plan"><span class="nav-icon">&#127919;</span>Piano Asta</button>
     <button data-view="players"><span class="nav-icon">&#9917;</span>Giocatori</button>
     <button data-view="tiers"><span class="nav-icon">&#9776;</span>Tier List</button>
     <button data-view="teams"><span class="nav-icon">&#128101;</span>Rose</button>
@@ -761,6 +826,23 @@ a { color: var(--accent2); text-decoration: none; }
 </div>
 </div>
 
+<div id="view-plan" class="view">
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:4px;">Piano Asta</h2>
+      <div style="font-size:.82rem;color:var(--text2);">Scegli i tuoi obiettivi per ruolo. Durante l'asta, il sistema ti avvisa quando un target o un suo equivalente viene chiamato.</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm" onclick="autoFillPlan()">Auto-genera piano</button>
+      <button class="btn-ghost btn-sm" onclick="clearPlan()">Svuota</button>
+    </div>
+  </div>
+  <div id="plan-budget-summary" class="card" style="margin-bottom:20px;"></div>
+  <div id="plan-roles"></div>
+</div>
+</div>
+
 <div class="modal-overlay" id="player-modal">
   <div class="modal" id="modal-content"></div>
 </div>
@@ -849,7 +931,7 @@ function toast(msg) {
 }
 
 // ── Navigation ──
-const VIEW_TITLES = {dashboard:'Asta Live',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
+const VIEW_TITLES = {dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebar-overlay').classList.toggle('open');
@@ -868,6 +950,7 @@ document.querySelectorAll('#nav button').forEach(btn => {
     if (btn.dataset.view === 'tiers') showTierRole('A');
     if (btn.dataset.view === 'teams' && currentAuction) refreshTeams();
     if (btn.dataset.view === 'players') renderPlayersDB();
+    if (btn.dataset.view === 'plan') renderPlan();
   });
 });
 
@@ -1426,6 +1509,267 @@ function renderSuggestion(allPurch, opponents, needs) {
   } else { suggestEl.style.display = 'none'; }
 }
 
+// ── Target Planning ──
+function getPlanKey() {
+  return `fw_plan_${currentAuction || 'default'}`;
+}
+
+function loadPlan() {
+  try {
+    const raw = localStorage.getItem(getPlanKey());
+    if (raw) { targetList = JSON.parse(raw); return; }
+  } catch(e) {}
+  targetList = {};
+}
+
+function savePlan() {
+  try { localStorage.setItem(getPlanKey(), JSON.stringify(targetList)); } catch(e) {}
+}
+
+function addTarget(role, playerId, maxPrice) {
+  if (!targetList[role]) targetList[role] = [];
+  if (targetList[role].find(t => t.playerId === playerId)) return;
+  targetList[role].push({playerId, maxPrice: maxPrice || 0});
+  savePlan();
+}
+
+function removeTarget(role, playerId) {
+  if (!targetList[role]) return;
+  targetList[role] = targetList[role].filter(t => t.playerId !== playerId);
+  savePlan();
+}
+
+function updateTargetPrice(role, playerId, maxPrice) {
+  if (!targetList[role]) return;
+  const t = targetList[role].find(t => t.playerId === playerId);
+  if (t) t.maxPrice = maxPrice;
+  savePlan();
+}
+
+function autoFillPlan() {
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  targetList = {};
+
+  for (const [role, count] of Object.entries(rosterSlots)) {
+    if (!count) continue;
+    const rolePlayers = allPlayers.filter(p => p.role_classic === role && !soldIds.has(p.id));
+    const scored = rolePlayers.map(pl => {
+      const ss = seasonMap[pl.id] || [];
+      const fma = projectFMA(pl, ss);
+      const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+      const rt = tierData[pl.role_classic] || {};
+      const ptd = (rt[tier]||[]).find(tp => tp.id === pl.id);
+      const adjFma = ptd ? ptd.adjFma : fma;
+      const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
+      const scarcity = computeScarcity(tier, rt);
+      const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
+      const rec = recommendedPrice(bp, role, tier, {}, scarcity, 999, mkt);
+      return {playerId: pl.id, adjFma, rec};
+    });
+    scored.sort((a,b) => b.adjFma - a.adjFma);
+    const budgetPct = (budgetSplits[role] || 25) / 100;
+    const roleBudget = credits * budgetPct;
+    let spent = 0;
+    targetList[role] = [];
+    for (const s of scored) {
+      if (targetList[role].length >= count) break;
+      const maxP = Math.round(s.rec * 1.2);
+      if (spent + s.rec > roleBudget && targetList[role].length > 0) {
+        targetList[role].push({playerId: s.playerId, maxPrice: Math.min(maxP, Math.round((roleBudget - spent) * 0.9))});
+      } else {
+        targetList[role].push({playerId: s.playerId, maxPrice: maxP});
+      }
+      spent += s.rec;
+    }
+  }
+  savePlan();
+  renderPlan();
+  toast('Piano auto-generato!');
+}
+
+function clearPlan() {
+  targetList = {};
+  savePlan();
+  renderPlan();
+}
+
+function renderPlan() {
+  loadPlan();
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  const roles = Object.keys(rosterSlots).length ? rosterSlots : {P:3,D:8,C:8,A:6};
+
+  // Budget summary
+  let budgetHtml = '<div style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">Budget pianificato per ruolo</div>';
+  let totalPlanned = 0;
+  for (const [role, count] of Object.entries(roles)) {
+    const tgts = targetList[role] || [];
+    const planned = tgts.reduce((a,t) => a + (t.maxPrice || 0), 0);
+    totalPlanned += planned;
+    const budgetPct = (budgetSplits[role] || 25) / 100;
+    const allocated = Math.round(credits * budgetPct);
+    const fillPct = allocated > 0 ? Math.min(planned / allocated * 100, 100) : 0;
+    const clr = fillPct > 100 ? 'var(--red)' : fillPct > 80 ? 'var(--yellow)' : 'var(--green)';
+    budgetHtml += `<div class="plan-budget-bar">
+      <span class="pbb-role">${role}</span>
+      <div class="pbb-bar"><div class="pbb-fill" style="width:${fillPct}%;background:${clr};"></div></div>
+      <span class="pbb-nums">${planned}/${allocated}cr (${tgts.length}/${count})</span>
+    </div>`;
+  }
+  budgetHtml += `<div style="margin-top:8px;font-size:.85rem;font-weight:700;color:${totalPlanned>credits?'var(--red)':'var(--accent)'};">Totale pianificato: ${totalPlanned}/${credits}cr</div>`;
+  document.getElementById('plan-budget-summary').innerHTML = budgetHtml;
+
+  // Role sections
+  let rolesHtml = '';
+  for (const [role, count] of Object.entries(roles)) {
+    const tgts = targetList[role] || [];
+    const planned = tgts.reduce((a,t) => a + (t.maxPrice || 0), 0);
+    rolesHtml += `<div class="plan-role-section">
+      <div class="plan-role-header">
+        <h3>${{P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'}[role]}</h3>
+        <div class="plan-role-meta">
+          <span>${tgts.length}/${count} obiettivi</span>
+          <span style="color:var(--accent);font-weight:700;">${planned}cr</span>
+        </div>
+      </div>
+      <div class="plan-role-body">`;
+
+    for (let i = 0; i < Math.max(count, tgts.length); i++) {
+      const tgt = tgts[i];
+      if (tgt) {
+        const pl = allPlayers.find(p => p.id === tgt.playerId);
+        if (!pl) continue;
+        const ss = seasonMap[pl.id] || [];
+        const fma = projectFMA(pl, ss);
+        const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+        const rt = tierData[pl.role_classic] || {};
+        const ptd = (rt[tier]||[]).find(tp => tp.id === pl.id);
+        const adjFma = ptd ? ptd.adjFma : fma;
+        const relPct = ptd ? Math.round(ptd.reliability * 100) : 100;
+        const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
+        const scarcity = computeScarcity(tier, rt);
+        const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
+        const rec = recommendedPrice(bp, role, tier, {}, scarcity, 999, mkt);
+        const isSold = soldIds.has(pl.id);
+        const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
+
+        const alts = findEquivalents(pl.id, seasonMap, tierData).slice(0, 3);
+        let altsHtml = '';
+        if (alts.length) {
+          altsHtml = `<div class="plan-alts"><div class="plan-alts-label">Alternative simili</div>`;
+          for (const alt of alts) {
+            const ap = alt.player;
+            const ass = seasonMap[ap.id] || [];
+            const afma = projectFMA(ap, ass);
+            const at = getPlayerTier(ap.id, ap.role_classic, tierData);
+            const art = tierData[ap.role_classic] || {};
+            const aptd = (art[at]||[]).find(tp => tp.id === ap.id);
+            const aAdj = aptd ? aptd.adjFma : afma;
+            const abp = basePrice(aAdj, role, credits, numTeams, totalSlots);
+            const asc = computeScarcity(at, art);
+            const amkt = scaleMarketPrice(ap.avg_auction_price, credits);
+            const arec = recommendedPrice(abp, role, at, {}, asc, 999, amkt);
+            altsHtml += `<div class="plan-alt-item" onclick="swapTarget('${role}',${pl.id},${ap.id},${Math.round(arec*1.2)})">
+              <span>${ap.name} <span style="color:var(--text3);">${ap.team} · F${at}</span></span>
+              <span style="font-weight:600;font-variant-numeric:tabular-nums;">${aAdj} FMA · ~${arec}cr</span>
+            </div>`;
+          }
+          altsHtml += '</div>';
+        }
+
+        rolesHtml += `<div class="plan-slot${isSold?' sold':''}">
+          <div class="plan-slot-num">${i+1}</div>
+          <div class="plan-slot-player" onclick="openPlayer(${pl.id})" style="cursor:pointer;">
+            <div class="plan-name">${pl.name} ${isSold?'<span style="font-size:.7rem;color:var(--red);font-weight:600;">VENDUTO</span>':''} ${pl.is_penalty_taker?'<span style="color:var(--yellow);">&#9917;</span>':''}</div>
+            <div class="plan-meta">${pl.team} · F${tier} · FMA adj ${adjFma} · Affid. <span style="color:${relClr};">${relPct}%</span> · Consigliato ~${rec}cr</div>
+          </div>
+          <div class="plan-slot-prices">
+            <span style="font-size:.72rem;color:var(--text3);">Max</span>
+            <input type="number" class="plan-max-price" value="${tgt.maxPrice}" min="1" data-role="${role}" data-pid="${pl.id}"
+              style="width:55px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);padding:5px 6px;border-radius:4px;text-align:center;font-family:var(--font);font-size:.85rem;font-weight:700;">
+          </div>
+          <div class="plan-slot-actions">
+            <button onclick="removeTarget('${role}',${pl.id});renderPlan();" title="Rimuovi">&#x2715;</button>
+          </div>
+        </div>${altsHtml}`;
+      } else if (i < count) {
+        rolesHtml += `<div class="plan-empty-slot" onclick="openSlotSearch('${role}',${i})">
+          <div class="plan-slot-num" style="background:var(--accent-dim);color:var(--accent);">+</div>
+          <span>Aggiungi obiettivo ${role} #${i+1}</span>
+        </div>`;
+      }
+    }
+
+    rolesHtml += `<div id="plan-search-${role}" style="display:none;padding:8px 16px;">
+      <input class="plan-search-inline" placeholder="Cerca ${role}..." oninput="planSearch('${role}',this.value)">
+      <div class="plan-search-results" id="plan-sr-${role}"></div>
+    </div>`;
+    rolesHtml += '</div></div>';
+  }
+  document.getElementById('plan-roles').innerHTML = rolesHtml;
+
+  // Max price change listeners
+  document.querySelectorAll('.plan-max-price').forEach(inp => {
+    inp.addEventListener('change', () => {
+      updateTargetPrice(inp.dataset.role, parseInt(inp.dataset.pid), parseInt(inp.value) || 0);
+      renderPlan();
+    });
+  });
+}
+
+function openSlotSearch(role, idx) {
+  const el = document.getElementById(`plan-search-${role}`);
+  const wasOpen = el.style.display !== 'none';
+  document.querySelectorAll('[id^="plan-search-"]').forEach(e => e.style.display = 'none');
+  if (!wasOpen) {
+    el.style.display = '';
+    el.querySelector('input').focus();
+  }
+}
+
+function planSearch(role, q) {
+  const el = document.getElementById(`plan-sr-${role}`);
+  if (q.length < 2) { el.innerHTML = ''; return; }
+  q = q.toLowerCase();
+  const existing = new Set((targetList[role]||[]).map(t => t.playerId));
+  const results = allPlayers.filter(p => p.role_classic === role && p.name.toLowerCase().includes(q) && !existing.has(p.id) && !soldIds.has(p.id)).slice(0, 8);
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+
+  el.innerHTML = results.map(pl => {
+    const ss = seasonMap[pl.id] || [];
+    const fma = projectFMA(pl, ss);
+    const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+    const rt = tierData[pl.role_classic] || {};
+    const ptd = (rt[tier]||[]).find(tp => tp.id === pl.id);
+    const adjFma = ptd ? ptd.adjFma : fma;
+    const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
+    const sc = computeScarcity(tier, rt);
+    const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
+    const rec = recommendedPrice(bp, role, tier, {}, sc, 999, mkt);
+    return `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${Math.round(rec*1.2)});renderPlan();">
+      <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} · F${tier}</span></span>
+      <span style="color:var(--accent);font-weight:700;">FMA ${adjFma} · ~${rec}cr</span>
+    </div>`;
+  }).join('');
+}
+
+function swapTarget(role, oldId, newId, maxPrice) {
+  removeTarget(role, oldId);
+  addTarget(role, newId, maxPrice);
+  renderPlan();
+}
+
 function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPrice) {
   const infl = inflation[role] || 1;
   const analytical = bp * infl * scarcity;
@@ -1667,6 +2011,7 @@ async function loadAuction(id) {
 
   await loadAllData();
   await loadAuctionPurchases();
+  loadPlan();
   document.querySelector('[data-view="dashboard"]').click();
 }
 
@@ -2595,6 +2940,7 @@ document.addEventListener('keydown', (e) => {
 renderSetup();
 loadExistingAuctions();
 loadAllData();
+loadPlan();
 if (!currentAuction) document.getElementById('strategy-section').style.display = 'none';
 </script>
 </body>
