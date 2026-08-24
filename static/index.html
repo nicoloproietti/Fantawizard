@@ -517,6 +517,19 @@ a { color: var(--accent2); text-decoration: none; }
   color: var(--text);
 }
 .upload-zone.uploading { opacity:.5; pointer-events:none; }
+.upload-zone.zone-quotazioni { border-color: var(--accent); }
+.upload-zone.zone-quotazioni:hover, .upload-zone.zone-quotazioni.dragover { border-color: var(--accent); background: rgba(47,197,238,.08); }
+.upload-zone.zone-stats { border-color: var(--green); }
+.upload-zone.zone-stats:hover, .upload-zone.zone-stats.dragover { border-color: var(--green); background: rgba(46,204,113,.08); }
+.upload-zone .zone-icon { font-size:1.6rem; margin-bottom:6px; }
+.progress-bar-wrap { width:100%; background:var(--bg2); border-radius:8px; height:22px; margin-top:10px; overflow:hidden; position:relative; border:1px solid var(--border); }
+.progress-bar-fill { height:100%; border-radius:8px; transition:width .15s ease; background:linear-gradient(90deg, var(--accent), #1a9fc7); }
+.progress-bar-fill.green { background:linear-gradient(90deg, var(--green), #1a9f5a); }
+.progress-bar-text { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+.budget-warn { font-size:.72rem; margin-top:6px; padding:6px 10px; border-radius:var(--radius); display:flex; align-items:center; gap:6px; }
+.budget-warn.over { background:rgba(231,76,60,.12); color:var(--red); }
+.budget-warn.under { background:rgba(241,196,15,.12); color:var(--yellow); }
+.budget-warn button { font-size:.7rem; padding:2px 8px; border-radius:4px; background:var(--bg3); border:1px solid var(--border); color:var(--text); cursor:pointer; }
 .data-stat {
   display: inline-block;
   background: var(--bg3);
@@ -858,9 +871,9 @@ a { color: var(--accent2); text-decoration: none; }
         Carica il file Excel o CSV delle quotazioni da Fantacalcio.it / Fantagazzetta.<br>
         Colonne: <span style="color:var(--text2);">Nome, R, RM, Squadra, Qt.A, Qt.I</span>
       </p>
-      <div class="upload-zone" id="drop-quotazioni" onclick="document.getElementById('file-quotazioni').click()">
-        <div style="font-size:1.5rem;margin-bottom:6px;">&#8593;</div>
-        <div style="font-weight:600;font-size:.88rem;">Trascina qui o clicca</div>
+      <div class="upload-zone zone-quotazioni" id="drop-quotazioni" onclick="document.getElementById('file-quotazioni').click()">
+        <div class="zone-icon">&#128203;</div>
+        <div style="font-weight:600;font-size:.88rem;">Carica Listone Quotazioni</div>
         <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">.xlsx .xls .csv</div>
       </div>
       <input type="file" id="file-quotazioni" accept=".xlsx,.xls,.csv" style="display:none">
@@ -880,9 +893,9 @@ a { color: var(--accent2); text-decoration: none; }
           <option value="2022-23">2022-23</option>
         </select>
       </div>
-      <div class="upload-zone" id="drop-stats" onclick="document.getElementById('file-stats').click()">
-        <div style="font-size:1.5rem;margin-bottom:6px;">&#8593;</div>
-        <div style="font-weight:600;font-size:.88rem;">Trascina qui o clicca</div>
+      <div class="upload-zone zone-stats" id="drop-stats" onclick="document.getElementById('file-stats').click()">
+        <div class="zone-icon">&#128200;</div>
+        <div style="font-weight:600;font-size:.88rem;">Carica Statistiche Stagione</div>
         <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">.xlsx .xls .csv</div>
       </div>
       <input type="file" id="file-stats" accept=".xlsx,.xls,.csv" style="display:none">
@@ -2158,13 +2171,15 @@ function renderBudgetSplits() {
     const pct = splits[role] || 0;
     const allocated = Math.round(credits * pct / 100);
     html += `<div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-weight:700;color:var(--accent);min-width:18px;">${role}</span>
-      <input type="range" min="0" max="60" value="${pct}" style="flex:1;accent-color:var(--accent);" oninput="updateBudgetSplit('${role}',this.value)">
+      <span style="font-weight:700;color:${ROLE_COLORS[role]};min-width:18px;">${role}</span>
+      <input type="range" min="0" max="60" value="${pct}" style="flex:1;accent-color:${ROLE_COLORS[role]};" oninput="updateBudgetSplit('${role}',this.value)">
       <span style="min-width:70px;font-size:.8rem;font-variant-numeric:tabular-nums;" id="split-val-${role}">${pct}% (${allocated}cr)</span>
     </div>`;
   }
   html += '</div>';
+  html += '<div id="budget-warn-box"></div>';
   document.getElementById('plan-budget-splits').innerHTML = html;
+  updateBudgetWarn(total);
 }
 
 function updateBudgetSplit(role, val) {
@@ -2177,8 +2192,44 @@ function updateBudgetSplit(role, val) {
   document.getElementById('split-val-' + role).textContent = `${val}% (${allocated}cr)`;
   const totalEl = document.getElementById('split-total');
   if (totalEl) { totalEl.textContent = total + '%'; totalEl.style.color = total === 100 ? 'var(--green)' : 'var(--red)'; }
+  updateBudgetWarn(total);
   savePlan();
   renderPlanBody();
+}
+
+function updateBudgetWarn(total) {
+  const box = document.getElementById('budget-warn-box');
+  if (!box) return;
+  if (total === 100) { box.innerHTML = ''; return; }
+  const cls = total > 100 ? 'over' : 'under';
+  const diff = Math.abs(total - 100);
+  const msg = total > 100 ? `Totale ${total}% (+${diff}% sopra 100%)` : `Totale ${total}% (mancano ${diff}%)`;
+  box.innerHTML = `<div class="budget-warn ${cls}">${msg} <button onclick="normalizeBudgetSplits()">Auto-bilancia</button></div>`;
+}
+
+function normalizeBudgetSplits() {
+  const splits = Object.keys(budgetSplits).length ? budgetSplits : {...DEFAULT_BUDGET};
+  const total = Object.values(splits).reduce((a,b)=>a+b, 0);
+  if (total === 0 || total === 100) return;
+  const roles = ['P','D','C','A'];
+  let newTotal = 0;
+  for (const r of roles) {
+    splits[r] = Math.round((splits[r] / total) * 100);
+    newTotal += splits[r];
+  }
+  let remainder = 100 - newTotal;
+  const sorted = roles.slice().sort((a,b) => splits[b] - splits[a]);
+  let i = 0;
+  while (remainder !== 0) {
+    splits[sorted[i % 4]] += remainder > 0 ? 1 : -1;
+    remainder += remainder > 0 ? -1 : 1;
+    i++;
+  }
+  budgetSplits = splits;
+  savePlan();
+  renderBudgetSplits();
+  renderPlanBody();
+  toast('Budget bilanciato al 100%', 'success');
 }
 
 function autoFillPlan() {
@@ -3502,7 +3553,10 @@ async function importQuotazioni(file) {
     if (colIdx.name === undefined) throw new Error(`Colonna "Nome" non trovata. Header: ${header.join(', ')}`);
 
     const totalData = rows.length - dataStart;
-    statusEl.innerHTML = `<span style="color:var(--yellow);">Importazione ${totalData} righe...</span>`;
+    statusEl.innerHTML = `<div class="progress-bar-wrap"><div class="progress-bar-fill" id="prog-quot-fill" style="width:0%"></div><div class="progress-bar-text" id="prog-quot-text">0 / ${totalData}</div></div>`;
+    const progFill = document.getElementById('prog-quot-fill');
+    const progText = document.getElementById('prog-quot-text');
+    const startTime = Date.now();
 
     let count = 0, updated = 0;
     for (let r = dataStart; r < rows.length; r++) {
@@ -3544,7 +3598,14 @@ async function importQuotazioni(file) {
       }
       count++;
 
-      if (count % 50 === 0) statusEl.innerHTML = `<span style="color:var(--yellow);">Importati ${count}/${totalData}...</span>`;
+      if (count % 10 === 0 || count === totalData) {
+        const pct = Math.round(count / totalData * 100);
+        progFill.style.width = pct + '%';
+        const elapsed = (Date.now() - startTime) / 1000;
+        const eta = count > 0 ? Math.round((elapsed / count) * (totalData - count)) : 0;
+        const etaStr = eta > 0 ? ` ~ ${eta}s` : '';
+        progText.textContent = `${count} / ${totalData} (${pct}%)${etaStr}`;
+      }
     }
 
     statusEl.innerHTML = `<span style="color:var(--green);">Importati ${count} giocatori (${updated} aggiornati, ${count - updated} nuovi)</span>`;
@@ -3596,7 +3657,10 @@ async function importStats(file) {
     const candidates = dbPlayers.map(p => [p.id, p.name]);
 
     const totalData = rows.length - dataStart;
-    statusEl.innerHTML = `<span style="color:var(--yellow);">Matching ${totalData} giocatori...</span>`;
+    statusEl.innerHTML = `<div class="progress-bar-wrap"><div class="progress-bar-fill green" id="prog-stats-fill" style="width:0%"></div><div class="progress-bar-text" id="prog-stats-text">0 / ${totalData}</div></div>`;
+    const progFill = document.getElementById('prog-stats-fill');
+    const progText = document.getElementById('prog-stats-text');
+    const startTime = Date.now();
 
     let count = 0, skipped = 0;
     for (let r = dataStart; r < rows.length; r++) {
@@ -3640,7 +3704,15 @@ async function importStats(file) {
       }
       count++;
 
-      if (count % 50 === 0) statusEl.innerHTML = `<span style="color:var(--yellow);">Importati ${count}/${totalData}...</span>`;
+      if (count % 10 === 0 || count === totalData) {
+        const processed = count + skipped;
+        const pct = Math.round(processed / totalData * 100);
+        progFill.style.width = pct + '%';
+        const elapsed = (Date.now() - startTime) / 1000;
+        const eta = processed > 0 ? Math.round((elapsed / processed) * (totalData - processed)) : 0;
+        const etaStr = eta > 0 ? ` ~ ${eta}s` : '';
+        progText.textContent = `${processed} / ${totalData} (${pct}%)${etaStr}`;
+      }
     }
 
     statusEl.innerHTML = `<span style="color:var(--green);">Importati ${count} record per ${season} (${skipped} non trovati)</span>`;
