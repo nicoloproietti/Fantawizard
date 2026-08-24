@@ -2351,82 +2351,101 @@ function autoFillPlan() {
   const numTeams = auctionData?.num_teams || 10;
   const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
   const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
-  const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
   const starters = getStartersNeeded();
   targetList = {};
 
+  // Score every available player once: adjFma = projected fantamedia weighted
+  // by reliability (games played), rec = expected auction price in this league.
+  const byRole = {};
+  for (const pl of allPlayers) {
+    const role = pl.role_classic;
+    if (!roles[role] || soldIds.has(pl.id)) continue;
+    const ss = seasonMap[pl.id] || [];
+    const fma = projectFMA(pl, ss);
+    const tier = getPlayerTier(pl.id, role, tierData);
+    const rt = tierData[role] || {};
+    const ptd = (rt[tier]||[]).find(tp => tp.id === pl.id);
+    const adjFma = ptd ? ptd.adjFma : fma;
+    const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
+    const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
+    const rec = Math.max(1, recommendedPrice(bp, role, tier, {}, computeScarcity(tier, rt), 999, mkt));
+    // When the model rates a player far above his market value, the market
+    // usually knows better (Serie B stats, lost starting spot): don't build
+    // the starting lineup on him.
+    const trusted = !mkt || bp <= 3 || mkt >= bp * 0.3;
+    if (!byRole[role]) byRole[role] = [];
+    byRole[role].push({playerId: pl.id, adjFma, rec, trusted});
+  }
+  for (const r of Object.keys(byRole)) byRole[r].sort((a,b) => b.adjFma - a.adjFma || a.rec - b.rec);
+
+  // Global knapsack over the starting lineup: maximize total adjFma with the
+  // whole budget minus 1cr reserved per bench slot. Start from the cheapest
+  // viable lineup, then greedily apply the upgrade with the best
+  // adjFma-gained per credit-spent until no affordable upgrade remains.
+  const nStartTot = Object.entries(roles).reduce((a,[r,c]) => a + Math.min(starters[r]||0, c), 0);
+  const benchSlots = totalSlots - nStartTot;
+  const starterBudget = credits - benchSlots;
+  const chosen = {};
+  const chosenIds = new Set();
+  let spent = 0;
   for (const [role, count] of Object.entries(roles)) {
-    if (!count) continue;
-    const budgetPct = (splits[role] || 0) / 100;
-    const roleBudget = Math.round(credits * budgetPct);
-    const nStarters = Math.min(starters[role] || 0, count);
-    const nBench = count - nStarters;
-
-    const starterBudget = nBench > 0 ? Math.round(roleBudget * 0.75) : roleBudget;
-    const benchBudget = roleBudget - starterBudget;
-
-    const rolePlayers = allPlayers.filter(p => p.role_classic === role && !soldIds.has(p.id));
-    const scored = rolePlayers.map(pl => {
-      const ss = seasonMap[pl.id] || [];
-      const fma = projectFMA(pl, ss);
-      const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
-      const rt = tierData[pl.role_classic] || {};
-      const ptd = (rt[tier]||[]).find(tp => tp.id === pl.id);
-      const adjFma = ptd ? ptd.adjFma : fma;
-      const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
-      const scarcity = computeScarcity(tier, rt);
-      const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
-      const rec = recommendedPrice(bp, role, tier, {}, scarcity, 999, mkt);
-      const value = rec > 0 ? adjFma / rec : adjFma;
-      return {playerId: pl.id, adjFma, rec: Math.max(rec, 1), value};
-    });
-
-    let starterSpent = 0;
-    targetList[role] = [];
-    const pickedIds = new Set();
-
-    const byFma = [...scored].sort((a,b) => b.adjFma - a.adjFma);
-    for (const s of byFma) {
-      if (targetList[role].length >= nStarters) break;
-      const remaining = starterBudget - starterSpent;
-      const slotsLeft = nStarters - targetList[role].length;
-      const avgPerSlot = Math.round(remaining / slotsLeft);
-      if (s.rec > remaining - (slotsLeft - 1)) continue;
-      const maxPrice = Math.max(s.rec, Math.min(avgPerSlot, remaining - (slotsLeft - 1)));
-      targetList[role].push({playerId: s.playerId, maxPrice, starter: true});
-      pickedIds.add(s.playerId);
-      starterSpent += maxPrice;
+    const n = Math.min(starters[role] || 0, count);
+    const byCost = (byRole[role]||[]).filter(s => s.trusted).sort((a,b) => a.rec - b.rec || b.adjFma - a.adjFma);
+    chosen[role] = byCost.slice(0, n);
+    for (const c of chosen[role]) { chosenIds.add(c.playerId); spent += c.rec; }
+  }
+  const CAND_LIMIT = 80;
+  for (let iter = 0; iter < 400; iter++) {
+    let best = null;
+    for (const role of Object.keys(chosen)) {
+      const cands = (byRole[role]||[]).filter(s => s.trusted).slice(0, CAND_LIMIT);
+      for (const cand of cands) {
+        if (chosenIds.has(cand.playerId)) continue;
+        for (const cur of chosen[role]) {
+          const dScore = cand.adjFma - cur.adjFma;
+          if (dScore <= 0) continue;
+          const dCost = cand.rec - cur.rec;
+          if (spent + dCost > starterBudget) continue;
+          const ratio = dCost > 0 ? dScore / dCost : Infinity;
+          if (!best || ratio > best.ratio) best = {role, cur, cand, dCost, ratio};
+        }
+      }
     }
-    for (const s of byFma) {
-      if (targetList[role].length >= nStarters) break;
-      if (pickedIds.has(s.playerId)) continue;
-      targetList[role].push({playerId: s.playerId, maxPrice: Math.max(1, s.rec), starter: true});
-      pickedIds.add(s.playerId);
-    }
+    if (!best) break;
+    const arr = chosen[best.role];
+    arr[arr.indexOf(best.cur)] = best.cand;
+    chosenIds.delete(best.cur.playerId);
+    chosenIds.add(best.cand.playerId);
+    spent += best.dCost;
+  }
 
-    let benchSpent = 0;
-    const byValue = [...scored].filter(s => !pickedIds.has(s.playerId)).sort((a,b) => b.value - a.value);
-    for (const s of byValue) {
+  // Bench: cheapest slots, best adjFma among low-price leftovers.
+  let leftover = credits - spent;
+  let totalAdj = 0;
+  for (const [role, count] of Object.entries(roles)) {
+    targetList[role] = [...(chosen[role]||[])].sort((a,b) => b.adjFma - a.adjFma)
+      .map(s => { totalAdj += s.adjFma; return {playerId: s.playerId, maxPrice: s.rec, starter: true}; });
+    const nBench = count - targetList[role].length;
+    if (nBench <= 0) continue;
+    const benchLeftTot = Object.entries(roles).reduce((a,[r,c]) => a + Math.max(0, c - (targetList[r]?.length || chosen[r]?.length || 0)), 0);
+    const benchCap = Math.max(1, Math.floor(leftover / Math.max(benchLeftTot, 1)));
+    const pool = (byRole[role]||[]).filter(s => !chosenIds.has(s.playerId) && s.rec <= benchCap);
+    for (const s of pool.slice(0, nBench)) {
+      targetList[role].push({playerId: s.playerId, maxPrice: Math.max(1, Math.min(s.rec, benchCap)), starter: false});
+      chosenIds.add(s.playerId);
+      leftover -= Math.max(1, Math.min(s.rec, benchCap));
+    }
+    for (const s of (byRole[role]||[])) {
       if (targetList[role].length >= count) break;
-      const remaining = benchBudget - benchSpent;
-      const slotsLeft = count - targetList[role].length;
-      const avgPerSlot = Math.round(remaining / slotsLeft);
-      if (s.rec > remaining - (slotsLeft - 1)) continue;
-      const maxPrice = Math.max(1, Math.min(avgPerSlot, remaining - (slotsLeft - 1)));
-      targetList[role].push({playerId: s.playerId, maxPrice, starter: false});
-      pickedIds.add(s.playerId);
-      benchSpent += maxPrice;
-    }
-    for (const s of byValue) {
-      if (targetList[role].length >= count) break;
-      if (pickedIds.has(s.playerId)) continue;
+      if (chosenIds.has(s.playerId)) continue;
       targetList[role].push({playerId: s.playerId, maxPrice: 1, starter: false});
-      pickedIds.add(s.playerId);
+      chosenIds.add(s.playerId);
+      leftover -= 1;
     }
   }
   savePlan();
   renderPlan();
-  toast('Piano generato in base al budget per ruolo!', 'success');
+  toast(`Piano ottimizzato: FMA titolari ${Math.round(totalAdj*10)/10}, spesa prevista ~${spent + (totalSlots - nStartTot)}cr`, 'success');
 }
 
 function clearPlan() {
