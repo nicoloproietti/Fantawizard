@@ -1125,7 +1125,7 @@ function searchPlayers(q) {
         </div>
         <div style="display:flex;gap:10px;align-items:center;">
           <span class="price-tag t${p.tier}">F${p.tier}</span>
-          ${p.mkt ? `<span style="font-size:.78rem;color:#26c6da;font-weight:600;font-variant-numeric:tabular-nums;">${p.mkt}</span>` : ''}
+          ${p.mkt ? `<span style="font-size:.78rem;color:#26c6da;font-weight:600;font-variant-numeric:tabular-nums;" title="FVM originale: ${p.avg_auction_price} (${FVM_REF_CREDITS}cr)">${p.mkt}${p.mkt !== p.avg_auction_price ? '<span style="font-size:.62rem;color:var(--text3);font-weight:400;margin-left:2px;">(' + p.avg_auction_price + ')</span>' : ''}</span>` : ''}
           <span class="rec-price">${p.rec}</span>
         </div>
       </div>
@@ -1292,15 +1292,18 @@ async function openPlayer(id) {
       <button class="btn" onclick="buyPlayer(${pl.id})">Compra</button>
     </div>` : '';
 
-  const mktScaled = currentAuction ? scaleMarketPrice(pl.avg_auction_price, auctionData.initial_credits) : (pl.avg_auction_price || null);
-  const mktLabel = currentAuction && auctionData.initial_credits !== FVM_REF_CREDITS && pl.avg_auction_price
-    ? `Media aste<br><span style="font-size:.6rem;color:var(--text3);">rif. ${auctionData.initial_credits}cr</span>`
-    : 'Media aste';
+  const mktRaw = pl.avg_auction_price || null;
+  const mktScaled = currentAuction ? scaleMarketPrice(mktRaw, auctionData.initial_credits) : mktRaw;
+  const isScaled = currentAuction && mktRaw && auctionData.initial_credits !== FVM_REF_CREDITS;
+  const mktValHtml = mktScaled ? (isScaled
+    ? `${mktScaled}<span style="font-size:.65rem;color:var(--text3);font-weight:400;display:block;">${mktRaw}@${FVM_REF_CREDITS}cr</span>`
+    : `${mktScaled}`) : '-';
+  const mktLabel = isScaled ? `Media aste (${auctionData.initial_credits}cr)` : 'Media aste';
   const statsGridHtml = currentAuction ? `
     <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
       <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
-      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktScaled || '-'}</div><div class="lbl">${mktLabel}</div></div>
+      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktValHtml}</div><div class="lbl">${mktLabel}</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
       <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
     </div>` : `
