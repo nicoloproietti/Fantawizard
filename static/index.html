@@ -2653,6 +2653,7 @@ function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPri
   let raw;
   if (marketPrice && marketPrice > 0) {
     raw = analytical * 0.55 + marketPrice * 0.45;
+    raw = Math.max(raw, marketPrice * 0.6);
   } else {
     raw = analytical;
   }
