@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FantaWizard</title>
 <script src="supabase.min.js"></script>
+<script src="xlsx.min.js"></script>
 <style>
 :root {
   --bg: #0f1117;
@@ -111,6 +112,11 @@ header nav button:hover, header nav button.active { background:var(--accent); co
 .tier-player.sold { opacity:.35; text-decoration:line-through; }
 .tier-player .fma { color:var(--accent2); font-weight:600; }
 
+.upload-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:30px 20px; text-align:center; cursor:pointer; transition:.2s; color:var(--text2); }
+.upload-zone:hover, .upload-zone.dragover { border-color:var(--accent); background:rgba(108,92,231,0.08); color:var(--text); }
+.upload-zone.uploading { opacity:.5; pointer-events:none; }
+.data-stat { display:inline-block; background:var(--bg3); padding:6px 14px; border-radius:var(--radius); margin:4px; }
+.data-stat strong { color:var(--accent2); }
 .toast { position:fixed; bottom:20px; right:20px; background:var(--green); color:#000; padding:12px 20px; border-radius:var(--radius); font-weight:600; z-index:300; display:none; }
 .toast.show { display:block; animation: fadeout 2s forwards; }
 @keyframes fadeout { 0%{opacity:1} 70%{opacity:1} 100%{opacity:0} }
@@ -123,6 +129,7 @@ header nav button:hover, header nav button.active { background:var(--accent); co
     <h1>FantaWizard</h1>
     <nav id="nav">
       <button data-view="setup" class="active">Setup</button>
+      <button data-view="data">Dati</button>
       <button data-view="dashboard">Asta Live</button>
       <button data-view="tiers">Tier List</button>
       <button data-view="teams">Rose</button>
@@ -169,6 +176,53 @@ header nav button:hover, header nav button.active { background:var(--accent); co
         <div id="modifiers-list"></div>
       </div>
     </div>
+  </div>
+</div>
+</div>
+
+<div id="view-data" class="view">
+<div class="container">
+  <div class="setup-grid">
+    <div class="card">
+      <h2>Quotazioni (Listone)</h2>
+      <p style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">
+        Carica il file Excel o CSV delle quotazioni da Fantacalcio.it / Fantagazzetta.<br>
+        Colonne riconosciute: <strong>Nome, R (ruolo), RM (ruolo mantra), Squadra, Qt.A, Qt.I</strong>
+      </p>
+      <div class="upload-zone" id="drop-quotazioni" onclick="document.getElementById('file-quotazioni').click()">
+        <div style="font-size:2rem;">&#128196;</div>
+        <div>Trascina qui o clicca per scegliere il file</div>
+        <div style="font-size:.75rem;color:var(--text2);">.xlsx, .xls, .csv</div>
+      </div>
+      <input type="file" id="file-quotazioni" accept=".xlsx,.xls,.csv" style="display:none">
+      <div id="quotazioni-status" style="margin-top:10px;font-size:.85rem;"></div>
+    </div>
+    <div class="card">
+      <h2>Statistiche Stagionali</h2>
+      <p style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">
+        Carica le statistiche reali dei giocatori (presenze, media voto, gol, assist...).<br>
+        Colonne riconosciute: <strong>Nome, Pg, Mv, Mf/Fm, Gol, Assist, Amm, Esp, Rig, Au</strong>
+      </p>
+      <div class="field"><label>Stagione</label>
+        <select id="stats-season">
+          <option value="2025-26">2025-26</option>
+          <option value="2024-25" selected>2024-25</option>
+          <option value="2023-24">2023-24</option>
+          <option value="2022-23">2022-23</option>
+        </select>
+      </div>
+      <div class="upload-zone" id="drop-stats" onclick="document.getElementById('file-stats').click()">
+        <div style="font-size:2rem;">&#128202;</div>
+        <div>Trascina qui o clicca per scegliere il file</div>
+        <div style="font-size:.75rem;color:var(--text2);">.xlsx, .xls, .csv</div>
+      </div>
+      <input type="file" id="file-stats" accept=".xlsx,.xls,.csv" style="display:none">
+      <div id="stats-status" style="margin-top:10px;font-size:.85rem;"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px;">
+    <h2>Stato dati</h2>
+    <div id="data-summary" style="font-size:.9rem;color:var(--text2);">Caricamento...</div>
   </div>
 </div>
 </div>
@@ -257,6 +311,7 @@ document.querySelectorAll('#nav button').forEach(btn => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if (btn.dataset.view === 'data') refreshDataSummary();
     if (btn.dataset.view === 'dashboard' && currentAuction) refreshDashboard();
     if (btn.dataset.view === 'tiers' && currentAuction) showTierRole('A');
     if (btn.dataset.view === 'teams' && currentAuction) refreshTeams();
@@ -842,6 +897,253 @@ async function refreshTeams() {
     </div>
   `).join('');
 }
+
+// ── Data Import ──
+const QUOT_COL_MAP = {
+  'r':'role_classic','rm':'role_mantra','ruolo':'role_classic','ruolom':'role_mantra',
+  'nome':'name','name':'name','squadra':'team','team':'team',
+  'qt. a':'initial_price','qt.a':'initial_price','qt. i':'current_price','qt.i':'current_price',
+  'prez_a':'initial_price','prez_i':'current_price',
+  'rigorista':'is_penalty_taker','rig.':'is_penalty_taker',
+};
+const STAT_COL_MAP = {
+  'presenze':'appearances','pg':'appearances','pv':'appearances',
+  'mv':'avg_rating','media voto':'avg_rating',
+  'mf':'fanta_avg','fantamedia':'fanta_avg','fm':'fanta_avg',
+  'gol':'goals','gf':'goals','reti':'goals',
+  'assist':'assists','ass':'assists',
+  'amm':'yellow_cards','ammonizioni':'yellow_cards',
+  'esp':'red_cards','espulsioni':'red_cards',
+  'rig':'penalties_taken','rigori':'penalties_taken','rt':'penalties_taken',
+  'rs':'penalties_scored','rp':'penalties_saved',
+  'au':'own_goals','autogol':'own_goals',
+  'min':'minutes','minuti':'minutes',
+  'gs':'goals_conceded','gol subiti':'goals_conceded',
+  'pi':'clean_sheets','porta inviolata':'clean_sheets',
+  'ass f':'assists_set_piece','assist fermo':'assists_set_piece',
+};
+
+function parseFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        resolve(rows);
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function normStr(s) {
+  return (s||'').toString().normalize('NFKD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function fuzzyMatch(name, candidates, threshold=0.6) {
+  const norm = normStr(name);
+  let bestId = null, bestScore = 0;
+  for (const [id, cname] of candidates) {
+    const cn = normStr(cname);
+    let score;
+    if (norm === cn) score = 1;
+    else if (norm.includes(cn) || cn.includes(norm)) score = 0.9;
+    else {
+      const ta = new Set(norm.split(' ')), tb = new Set(cn.split(' '));
+      const inter = [...ta].filter(x => tb.has(x)).length;
+      const union = new Set([...ta,...tb]).size;
+      score = union ? inter / union : 0;
+    }
+    if (score > bestScore) { bestScore = score; bestId = id; }
+  }
+  return bestScore >= threshold ? bestId : null;
+}
+
+async function importQuotazioni(file) {
+  const statusEl = document.getElementById('quotazioni-status');
+  statusEl.innerHTML = '<span style="color:var(--yellow);">Analisi file...</span>';
+  document.getElementById('drop-quotazioni').classList.add('uploading');
+
+  try {
+    const rows = await parseFile(file);
+    if (!rows.length) throw new Error('File vuoto');
+
+    const header = rows[0].map(h => (h||'').toString().trim().toLowerCase());
+    const colIdx = {};
+    for (let i = 0; i < header.length; i++) {
+      const mapped = QUOT_COL_MAP[header[i]];
+      if (mapped) colIdx[mapped] = i;
+      if (!colIdx.name && (header[i].includes('nome') || header[i] === 'name')) colIdx.name = i;
+    }
+    if (colIdx.name === undefined) throw new Error(`Colonna "Nome" non trovata. Header: ${header.join(', ')}`);
+
+    statusEl.innerHTML = `<span style="color:var(--yellow);">Importazione ${rows.length - 1} righe...</span>`;
+
+    let count = 0, updated = 0;
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      const name = (row[colIdx.name]||'').toString().trim();
+      if (!name) continue;
+
+      const data = {name, active: true};
+      for (const [field, idx] of Object.entries(colIdx)) {
+        if (field === 'name') continue;
+        let val = (row[idx]||'').toString().trim();
+        if (!val) continue;
+        if (field === 'initial_price' || field === 'current_price') {
+          data[field] = parseInt(parseFloat(val.replace(',','.'))) || 1;
+        } else if (field === 'is_penalty_taker') {
+          data[field] = val === '1' || val.toLowerCase() === 'si' || val.toLowerCase() === 'sì' || val.toLowerCase() === 'true';
+        } else {
+          data[field] = val;
+        }
+      }
+
+      const {data: existing} = await sb.from('players').select('id').eq('name', name).maybeSingle();
+      if (existing) {
+        await sb.from('players').update(data).eq('id', existing.id);
+        updated++;
+      } else {
+        await sb.from('players').insert(data);
+      }
+      count++;
+
+      if (count % 50 === 0) statusEl.innerHTML = `<span style="color:var(--yellow);">Importati ${count}/${rows.length - 1}...</span>`;
+    }
+
+    statusEl.innerHTML = `<span style="color:var(--green);">Importati ${count} giocatori (${updated} aggiornati, ${count - updated} nuovi)</span>`;
+    toast(`${count} giocatori importati!`);
+    await loadAllData();
+    refreshDataSummary();
+  } catch(err) {
+    statusEl.innerHTML = `<span style="color:var(--red);">Errore: ${err.message}</span>`;
+  } finally {
+    document.getElementById('drop-quotazioni').classList.remove('uploading');
+  }
+}
+
+async function importStats(file) {
+  const season = document.getElementById('stats-season').value;
+  const statusEl = document.getElementById('stats-status');
+  statusEl.innerHTML = '<span style="color:var(--yellow);">Analisi file...</span>';
+  document.getElementById('drop-stats').classList.add('uploading');
+
+  try {
+    const rows = await parseFile(file);
+    if (!rows.length) throw new Error('File vuoto');
+
+    const header = rows[0].map(h => (h||'').toString().trim().toLowerCase());
+    let nameIdx = null;
+    for (let i = 0; i < header.length; i++) {
+      if (header[i].includes('nome') || header[i] === 'name') { nameIdx = i; break; }
+    }
+    if (nameIdx === null) throw new Error(`Colonna "Nome" non trovata. Header: ${header.join(', ')}`);
+
+    const colMap = {};
+    for (let i = 0; i < header.length; i++) {
+      const mapped = STAT_COL_MAP[header[i]];
+      if (mapped) colMap[mapped] = i;
+    }
+
+    const {data: dbPlayers} = await sb.from('players').select('id, name');
+    const candidates = (dbPlayers||[]).map(p => [p.id, p.name]);
+
+    if (!candidates.length) throw new Error('Nessun giocatore in database. Carica prima le quotazioni.');
+
+    statusEl.innerHTML = `<span style="color:var(--yellow);">Matching ${rows.length - 1} giocatori...</span>`;
+
+    let count = 0, skipped = 0;
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      const rawName = (row[nameIdx]||'').toString().trim();
+      if (!rawName) continue;
+
+      const playerId = fuzzyMatch(rawName, candidates);
+      if (!playerId) { skipped++; continue; }
+
+      const statData = {player_id: playerId, season};
+      for (const [field, idx] of Object.entries(colMap)) {
+        let val = (row[idx]||'').toString().replace(',','.').trim();
+        if (!val) continue;
+        try {
+          val = parseFloat(val);
+          if (!['avg_rating','fanta_avg'].includes(field)) val = Math.round(val);
+          statData[field] = val;
+        } catch(e) {}
+      }
+
+      const {data: existing} = await sb.from('player_seasons').select('id')
+        .eq('player_id', playerId).eq('season', season).maybeSingle();
+
+      if (existing) {
+        await sb.from('player_seasons').update(statData).eq('id', existing.id);
+      } else {
+        await sb.from('player_seasons').insert(statData);
+      }
+      count++;
+
+      if (count % 50 === 0) statusEl.innerHTML = `<span style="color:var(--yellow);">Importati ${count}/${rows.length - 1}...</span>`;
+    }
+
+    statusEl.innerHTML = `<span style="color:var(--green);">Importati ${count} record per ${season} (${skipped} non trovati)</span>`;
+    toast(`Statistiche ${season}: ${count} importate!`);
+    await loadAllData();
+    refreshDataSummary();
+  } catch(err) {
+    statusEl.innerHTML = `<span style="color:var(--red);">Errore: ${err.message}</span>`;
+  } finally {
+    document.getElementById('drop-stats').classList.remove('uploading');
+  }
+}
+
+async function refreshDataSummary() {
+  const el = document.getElementById('data-summary');
+  const [{data: players, count: pc}, {data: seasons}] = await Promise.all([
+    sb.from('players').select('id, role_classic', {count:'exact'}).eq('active', true),
+    sb.from('player_seasons').select('season'),
+  ]);
+
+  const nPlayers = pc || (players||[]).length;
+  const byRole = {};
+  for (const p of (players||[])) byRole[p.role_classic] = (byRole[p.role_classic]||0) + 1;
+  const seasonSet = new Set((seasons||[]).map(s => s.season));
+  const seasonCounts = {};
+  for (const s of (seasons||[])) seasonCounts[s.season] = (seasonCounts[s.season]||0) + 1;
+
+  let html = `<div style="margin-bottom:8px;"><strong>${nPlayers}</strong> giocatori in database</div>`;
+  html += '<div style="margin-bottom:8px;">';
+  for (const [r, c] of Object.entries(byRole).sort()) html += `<span class="data-stat"><strong>${c}</strong> ${r}</span>`;
+  html += '</div>';
+  if (seasonSet.size) {
+    html += '<div style="margin-bottom:4px;">Statistiche caricate:</div><div>';
+    for (const [s, c] of Object.entries(seasonCounts).sort().reverse()) html += `<span class="data-stat"><strong>${c}</strong> record per ${s}</span>`;
+    html += '</div>';
+  } else {
+    html += '<div style="color:var(--yellow);">Nessuna statistica caricata</div>';
+  }
+  el.innerHTML = html;
+}
+
+// Wire up file inputs and drag-drop
+['quotazioni','stats'].forEach(type => {
+  const fileInput = document.getElementById(`file-${type}`);
+  const dropZone = document.getElementById(`drop-${type}`);
+  const handler = type === 'quotazioni' ? importQuotazioni : importStats;
+
+  fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handler(e.target.files[0]); });
+
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handler(e.dataTransfer.files[0]);
+  });
+});
 
 // ── Keyboard shortcuts ──
 document.addEventListener('keydown', (e) => {
