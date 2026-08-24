@@ -530,6 +530,62 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .tier-filter-bar button:hover { background: var(--bg4); color: var(--text); }
 .tier-filter-bar button.active-filter { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+/* ── Call Panel (Auction Copilot) ── */
+.call-panel { display:none; background:var(--bg2); border:2px solid var(--accent); border-radius:var(--radius-lg); padding:20px; margin-bottom:20px; animation:callIn .25s ease; }
+.call-panel.active { display:block; }
+@keyframes callIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+.call-header { display:flex; justify-content:space-between; align-items:start; margin-bottom:14px; }
+.call-header h2 { font-size:1.2rem; font-weight:800; margin:0; }
+.call-header .call-role { font-size:.75rem; font-weight:700; padding:3px 10px; border-radius:20px; margin-left:8px; vertical-align:middle; }
+.call-header .call-close { background:var(--bg3); border:1px solid var(--border2); color:var(--text2); width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:.85rem; display:flex; align-items:center; justify-content:center; }
+.call-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+@media(max-width:600px){ .call-stats{grid-template-columns:repeat(2,1fr);} }
+.call-stat { background:var(--bg3); padding:10px 8px; border-radius:var(--radius-sm); text-align:center; border:1px solid var(--border); }
+.call-stat .val { font-size:1.3rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.call-stat .lbl { font-size:.62rem; color:var(--text2); text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
+
+.price-range-bar { position:relative; height:32px; background:var(--bg); border-radius:16px; overflow:visible; margin:8px 0 4px; border:1px solid var(--border); }
+.price-range-fill { position:absolute; top:0; bottom:0; border-radius:16px; }
+.price-range-fill.zone-affare { background:var(--green); opacity:.25; }
+.price-range-fill.zone-fair { background:var(--yellow); opacity:.2; }
+.price-range-fill.zone-over { background:var(--red); opacity:.15; }
+.price-range-marker { position:absolute; top:-4px; width:4px; height:40px; border-radius:2px; transform:translateX(-50%); z-index:2; }
+.price-range-labels { display:flex; justify-content:space-between; font-size:.65rem; color:var(--text3); margin-top:2px; padding:0 2px; }
+.price-range-bid { position:absolute; top:50%; transform:translate(-50%,-50%); z-index:3; font-size:.7rem; font-weight:800; padding:2px 8px; border-radius:10px; white-space:nowrap; }
+
+.bid-tracker { display:flex; align-items:center; justify-content:center; gap:12px; margin:14px 0; }
+.bid-btn { width:48px; height:48px; border-radius:50%; border:2px solid var(--border2); background:var(--bg3); color:var(--text); font-size:1.5rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .12s; font-family:var(--font); }
+.bid-btn:hover { border-color:var(--accent); background:var(--accent-dim); }
+.bid-btn:active { transform:scale(.92); }
+.bid-display { font-size:2.5rem; font-weight:800; font-variant-numeric:tabular-nums; min-width:80px; text-align:center; letter-spacing:-.02em; }
+.bid-signal { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; text-align:center; padding:4px 16px; border-radius:20px; }
+.bid-signal.green { color:#000; background:var(--green); }
+.bid-signal.yellow { color:#000; background:var(--yellow); }
+.bid-signal.red { color:#fff; background:var(--red); }
+
+.call-actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+.call-actions .btn { flex:1; min-width:120px; text-align:center; }
+
+.opportunity-alert { display:none; background:rgba(255,215,64,.08); border:1px solid var(--yellow); border-radius:var(--radius); padding:12px 16px; margin-bottom:12px; font-size:.82rem; }
+.opportunity-alert.active { display:flex; gap:10px; align-items:start; }
+.opportunity-alert .opp-icon { font-size:1.2rem; flex-shrink:0; }
+.opportunity-alert .opp-text { flex:1; line-height:1.4; }
+.opportunity-alert .opp-text strong { color:var(--yellow); }
+
+.strategy-panel { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
+@media(max-width:900px){ .strategy-panel{grid-template-columns:1fr;} }
+.strat-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+.strat-card h3 { font-size:.75rem; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; }
+.strat-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:.82rem; }
+.strat-row:last-child { border-bottom:none; }
+.strat-row .team-budget { display:flex; gap:6px; align-items:center; }
+.strat-badge { font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:10px; }
+.strat-badge.urgent { background:rgba(255,82,82,.15); color:var(--red); }
+.strat-badge.ok { background:rgba(0,230,118,.1); color:var(--green); }
+.strat-badge.warn { background:rgba(255,215,64,.12); color:var(--yellow); }
+.suggest-card { background:var(--accent-dim); border:1px solid var(--accent); border-radius:var(--radius); padding:14px; margin-top:12px; }
+.suggest-card h3 { font-size:.72rem; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
 </style>
 </head>
 <body>
@@ -645,7 +701,7 @@ a { color: var(--accent2); text-decoration: none; }
 
 <div id="view-dashboard" class="view active">
 <div class="container">
-  <div style="display:flex;gap:10px;align-items:stretch;margin-bottom:24px;">
+  <div style="display:flex;gap:10px;align-items:stretch;margin-bottom:16px;">
     <div class="search-box" style="flex:1;">
       <input id="player-search" placeholder="Cerca giocatore..." autocomplete="off">
       <div class="search-results" id="search-results"></div>
@@ -655,6 +711,16 @@ a { color: var(--accent2); text-decoration: none; }
       <span style="color:var(--text3);font-size:.82rem;">cr</span>
     </div>
   </div>
+
+  <!-- Call Panel -->
+  <div class="call-panel" id="call-panel"></div>
+
+  <!-- Opportunity Alert -->
+  <div class="opportunity-alert" id="opp-alert">
+    <span class="opp-icon">&#9889;</span>
+    <div class="opp-text" id="opp-text"></div>
+  </div>
+
   <div class="dash-top">
     <div>
       <div class="card">
@@ -666,9 +732,29 @@ a { color: var(--accent2); text-decoration: none; }
       </div>
     </div>
     <div>
-      <div class="card">
+      <div class="card" style="margin-bottom:16px;">
         <h2>Il mio budget</h2>
         <div id="budget-display"></div>
+      </div>
+      <div class="card" id="roster-needs-card" style="display:none;">
+        <h2>Manca alla rosa</h2>
+        <div id="roster-needs"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Strategy Panel -->
+  <div class="strategy-panel" id="strategy-section">
+    <div class="strat-card">
+      <h3>Budget avversari</h3>
+      <div id="opponent-tracker"></div>
+    </div>
+    <div class="strat-card">
+      <h3>Fase asta</h3>
+      <div id="auction-phase"></div>
+      <div class="suggest-card" id="suggest-call" style="display:none;">
+        <h3>&#128161; Suggerimento</h3>
+        <div id="suggest-text"></div>
       </div>
     </div>
   </div>
@@ -733,6 +819,7 @@ let auctionData = null;
 let allPlayers = [];
 let allSeasons = [];
 let soldIds = new Set();
+let userSoldIds = new Set();
 let teamsCache = [];
 let bonusMap = {};
 let modFlags = {};
@@ -954,6 +1041,391 @@ function computeMaxBid(auction, userPurchases) {
   return Math.max(0, auction.initial_credits - spent - (remaining - 1));
 }
 
+// ── Auction Copilot Engine ──
+let calledPlayer = null;
+let currentBid = 0;
+let targetList = {}; // {role: [{playerId, priority}]}
+
+function computePriceRange(adjFma, role, tier, inflation, scarcity, maxBid, marketPrice) {
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
+  const rec = recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPrice);
+  const affare = Math.max(1, Math.round(rec * 0.75));
+  const needsRole = getRoleNeed(role);
+  const scarcMul = scarcity > 1.1 ? 1.15 : 1;
+  const needMul = needsRole.urgent ? 1.2 : 1;
+  const maxPush = Math.min(Math.round(rec * 1.3 * scarcMul * needMul), maxBid || 999);
+  return {affare, consigliato: rec, maxPush};
+}
+
+function computeSimilarity(p1Id, p2Id, seasonMap, tierData) {
+  const pl1 = allPlayers.find(p => p.id === p1Id);
+  const pl2 = allPlayers.find(p => p.id === p2Id);
+  if (!pl1 || !pl2 || pl1.role_classic !== pl2.role_classic) return 0;
+  const ss1 = seasonMap[p1Id] || [], ss2 = seasonMap[p2Id] || [];
+  const fma1 = projectFMA(pl1, ss1), fma2 = projectFMA(pl2, ss2);
+  if (fma1 < 1 || fma2 < 1) return 0;
+  const fmaDiff = Math.abs(fma1 - fma2) / Math.max(fma1, fma2);
+  const apps1 = weightedStat(ss1, 'appearances'), apps2 = weightedStat(ss2, 'appearances');
+  const appsDiff = apps1 > 0 && apps2 > 0 ? Math.abs(apps1 - apps2) / Math.max(apps1, apps2) : 0.5;
+  const g1 = weightedStat(ss1, 'goals'), g2 = weightedStat(ss2, 'goals');
+  const a1 = weightedStat(ss1, 'assists'), a2 = weightedStat(ss2, 'assists');
+  const bonusDiff = (Math.abs(g1-g2) + Math.abs(a1-a2)) / (Math.max(g1+a1, g2+a2, 1));
+  const rig = (pl1.is_penalty_taker === pl2.is_penalty_taker) ? 0 : 0.1;
+  const score = 1 - (fmaDiff * 0.45 + appsDiff * 0.2 + bonusDiff * 0.25 + rig);
+  return Math.max(0, Math.min(1, score));
+}
+
+function findEquivalents(playerId, seasonMap, tierData) {
+  const pl = allPlayers.find(p => p.id === playerId);
+  if (!pl) return [];
+  const sameRole = allPlayers.filter(p => p.role_classic === pl.role_classic && p.id !== playerId && !soldIds.has(p.id));
+  const scored = sameRole.map(p => ({player: p, similarity: computeSimilarity(playerId, p.id, seasonMap, tierData)}));
+  scored.sort((a,b) => b.similarity - a.similarity);
+  return scored.filter(s => s.similarity >= 0.7).slice(0, 5);
+}
+
+function getRoleNeed(role) {
+  if (!currentAuction) return {have:0, need:0, remaining:0, urgent:false};
+  const need = rosterSlots[role] || 0;
+  const have = [...userSoldIds].filter(sid => {
+    const pl = allPlayers.find(p => p.id === sid);
+    return pl && pl.role_classic === role;
+  }).length;
+  const remaining = Math.max(0, need - have);
+  const availF12 = allPlayers.filter(p => p.role_classic === role && !soldIds.has(p.id)).length;
+  return {have, need, remaining, urgent: remaining > 0 && availF12 <= remaining * 3};
+}
+
+function getAllRosterNeeds() {
+  const needs = {};
+  for (const role of ['P','D','C','A']) needs[role] = getRoleNeed(role);
+  return needs;
+}
+
+function getOpponentBudgets(allPurchases) {
+  const data = {};
+  for (const t of teamsCache) {
+    const tp = allPurchases.filter(p => p.team_id === t.id);
+    const spent = tp.reduce((a,p) => a + p.price, 0);
+    const remaining = (auctionData?.initial_credits || 500) - spent;
+    const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0);
+    const slotsLeft = totalSlots - tp.length;
+    const rolesBought = {};
+    for (const p of tp) {
+      const pl = allPlayers.find(x => x.id === p.player_id);
+      if (pl) rolesBought[pl.role_classic] = (rolesBought[pl.role_classic]||0) + 1;
+    }
+    data[t.id] = {team:t, spent, remaining, slotsLeft, count:tp.length, rolesBought};
+  }
+  return data;
+}
+
+function getAuctionPhase(allPurchases) {
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0);
+  const totalNeeded = totalSlots * (auctionData?.num_teams || 10);
+  const bought = allPurchases.length;
+  const pct = bought / Math.max(totalNeeded, 1);
+  const opponents = getOpponentBudgets(allPurchases);
+  const lowBudget = Object.values(opponents).filter(o => o.remaining < (auctionData?.initial_credits || 500) * 0.15).length;
+  if (pct < 0.3) return {phase:'inizio', label:'Inizio asta', detail:`${bought}/${totalNeeded} slot occupati. Budget alti, aspettati rilanci aggressivi.`, lowBudget};
+  if (pct < 0.65) return {phase:'meta', label:'Metà asta', detail:`${bought}/${totalNeeded} slot. ${lowBudget} squadre con budget basso — iniziano le occasioni.`, lowBudget};
+  return {phase:'fine', label:'Fine asta', detail:`${bought}/${totalNeeded} slot. ${lowBudget} squadre quasi a secco — è tempo di occasioni!`, lowBudget};
+}
+
+function getBidSignal(bid, range) {
+  if (bid <= range.affare) return {cls:'green', text:'Affare!'};
+  if (bid <= range.consigliato) return {cls:'green', text:'Buon prezzo'};
+  if (bid <= range.maxPush) return {cls:'yellow', text:'Nella norma'};
+  return {cls:'red', text:'Stai strapagando'};
+}
+
+function renderPriceBar(range, bid) {
+  const max = Math.max(range.maxPush * 1.4, bid * 1.2, range.consigliato * 1.5);
+  const pctA = (range.affare / max) * 100;
+  const pctC = (range.consigliato / max) * 100;
+  const pctM = (range.maxPush / max) * 100;
+  const pctBid = Math.min((bid / max) * 100, 98);
+  const bidClr = bid <= range.affare ? 'var(--green)' : bid <= range.consigliato ? 'var(--green)' : bid <= range.maxPush ? 'var(--yellow)' : 'var(--red)';
+  return `<div class="price-range-bar">
+    <div class="price-range-fill zone-affare" style="left:0;width:${pctA}%;"></div>
+    <div class="price-range-fill zone-fair" style="left:${pctA}%;width:${pctC-pctA}%;"></div>
+    <div class="price-range-fill zone-over" style="left:${pctC}%;width:${pctM-pctC}%;"></div>
+    <div class="price-range-marker" style="left:${pctA}%;background:var(--green);"></div>
+    <div class="price-range-marker" style="left:${pctC}%;background:var(--yellow);"></div>
+    <div class="price-range-marker" style="left:${pctM}%;background:var(--red);"></div>
+    <div class="price-range-bid" style="left:${pctBid}%;background:${bidClr};color:${bid<=range.consigliato?'#000':'#fff'};">${bid}cr</div>
+  </div>
+  <div class="price-range-labels">
+    <span>Affare ${range.affare}</span>
+    <span>Fair ${range.consigliato}</span>
+    <span>Max ${range.maxPush}</span>
+  </div>`;
+}
+
+function checkOpportunity(playerId, seasonMap, tierData) {
+  const tgts = Object.values(targetList).flat();
+  if (!tgts.length) return null;
+  for (const tgt of tgts) {
+    if (tgt.playerId === playerId) return {type:'target', msg:`Nel tuo piano!`};
+  }
+  for (const tgt of tgts) {
+    if (soldIds.has(tgt.playerId)) continue;
+    const sim = computeSimilarity(playerId, tgt.playerId, seasonMap, tierData);
+    if (sim >= 0.75) {
+      const tgtPl = allPlayers.find(p => p.id === tgt.playerId);
+      return {type:'equivalent', msg:`Simile a <strong>${tgtPl?.name}</strong> (${Math.round(sim*100)}% match)`, targetId:tgt.playerId};
+    }
+  }
+  return null;
+}
+
+async function callPlayer(playerId) {
+  const pl = allPlayers.find(p => p.id === playerId);
+  if (!pl) return;
+  calledPlayer = pl;
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+  const roleTiers = tierData[pl.role_classic] || {};
+  const tierList2 = roleTiers[tier] || [];
+  const ptd = tierList2.find(tp => tp.id === pl.id);
+  const adjFma = ptd ? ptd.adjFma : projectFMA(pl, seasonMap[pl.id]||[]);
+  const reliability = ptd ? ptd.reliability : 1;
+  const relPct = Math.round(reliability * 100);
+
+  let infl = {}, mb = 999, purch = [];
+  if (currentAuction) {
+    const res = await sb.from('purchases').select('*').eq('auction_id', currentAuction);
+    purch = res.data || [];
+    infl = computeInflation(purch, buildPlayerMap(), seasonMap);
+    const userTeam = teamsCache.find(t => t.is_user);
+    const userPurchases = purch.filter(p => p.team_id === userTeam?.id);
+    mb = computeMaxBid(auctionData, userPurchases);
+  }
+  const scarcity = computeScarcity(tier, roleTiers);
+  const mkt = scaleMarketPrice(pl.avg_auction_price, getActiveCredits());
+  const range = computePriceRange(adjFma, pl.role_classic, tier, infl, scarcity, mb, mkt);
+  currentBid = range.consigliato;
+
+  const opp = checkOpportunity(pl.id, seasonMap, tierData);
+  const oppEl = document.getElementById('opp-alert');
+  if (opp) {
+    document.getElementById('opp-text').innerHTML = opp.type === 'target'
+      ? `<strong>Obiettivo!</strong> ${pl.name} è nel tuo piano.`
+      : `<strong>Occasione!</strong> ${pl.name} è equivalente a un tuo obiettivo. ${opp.msg}`;
+    oppEl.classList.add('active');
+  } else { oppEl.classList.remove('active'); }
+
+  const roleNeed = getRoleNeed(pl.role_classic);
+  const tierCls = `t${tier}`;
+  const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
+  const signal = getBidSignal(currentBid, range);
+
+  const panel = document.getElementById('call-panel');
+  panel.dataset.playerId = pl.id;
+  panel.dataset.range = JSON.stringify(range);
+  panel.dataset.maxBid = mb;
+  panel.innerHTML = `
+    <div class="call-header">
+      <div>
+        <h2>${pl.name} <span class="call-role price-tag ${tierCls}">F${tier} · ${pl.role_classic}</span></h2>
+        <div style="color:var(--text2);font-size:.82rem;margin-top:2px;">${pl.team} ${pl.is_penalty_taker?'· &#9917; Rigorista':''} · Affid. <span style="color:${relClr};font-weight:700;">${relPct}%</span>${roleNeed.remaining>0?' · <span style="color:var(--yellow);font-weight:600;">Ti serve questo ruolo ('+roleNeed.remaining+' slot)</span>':''}</div>
+      </div>
+      <button class="call-close" onclick="closeCallPanel()">&#x2715;</button>
+    </div>
+    <div class="call-stats">
+      <div class="call-stat"><div class="val" style="color:var(--accent);">${adjFma}</div><div class="lbl">FMA adj</div></div>
+      <div class="call-stat"><div class="val" style="color:var(--green);">${range.affare}</div><div class="lbl">Affare</div></div>
+      <div class="call-stat"><div class="val" style="color:var(--yellow);">${range.consigliato}</div><div class="lbl">Consigliato</div></div>
+      <div class="call-stat"><div class="val" style="color:var(--red);">${range.maxPush}</div><div class="lbl">Max spingi</div></div>
+    </div>
+    <div id="call-price-bar">${renderPriceBar(range, currentBid)}</div>
+    <div class="bid-tracker">
+      <button class="bid-btn" onclick="changeBid(-1)">-</button>
+      <div class="bid-display" id="bid-display" style="color:${signal.cls==='red'?'var(--red)':signal.cls==='yellow'?'var(--yellow)':'var(--green)'};">${currentBid}</div>
+      <button class="bid-btn" onclick="changeBid(1)">+</button>
+    </div>
+    <div class="bid-signal ${signal.cls}" id="bid-signal">${signal.text}</div>
+    <div class="call-actions">
+      <button class="btn" onclick="quickBuy()">&#10003; Compra per me</button>
+      <button class="btn" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);" onclick="assignToOther()">Assegna ad altro</button>
+      <button class="btn-ghost" onclick="closeCallPanel()">Salta</button>
+      <button class="btn-ghost" style="border-color:var(--text3);color:var(--text2);" onclick="openPlayer(${pl.id})">Dettagli</button>
+    </div>`;
+  panel.classList.add('active');
+  document.getElementById('search-results').classList.remove('open');
+  document.getElementById('player-search').value = '';
+}
+
+function changeBid(delta) {
+  const panel = document.getElementById('call-panel');
+  const range = JSON.parse(panel.dataset.range);
+  const mb = parseInt(panel.dataset.maxBid) || 999;
+  currentBid = Math.max(1, Math.min(currentBid + delta, mb));
+  const signal = getBidSignal(currentBid, range);
+  const clr = signal.cls === 'red' ? 'var(--red)' : signal.cls === 'yellow' ? 'var(--yellow)' : 'var(--green)';
+  document.getElementById('bid-display').textContent = currentBid;
+  document.getElementById('bid-display').style.color = clr;
+  document.getElementById('bid-signal').className = `bid-signal ${signal.cls}`;
+  document.getElementById('bid-signal').textContent = signal.text;
+  document.getElementById('call-price-bar').innerHTML = renderPriceBar(range, currentBid);
+}
+
+async function quickBuy() {
+  if (!currentAuction || !calledPlayer) return;
+  const userTeam = teamsCache.find(t => t.is_user);
+  if (!userTeam) { alert('Nessuna squadra utente trovata'); return; }
+  const {error} = await sb.from('purchases').insert({auction_id:currentAuction, player_id:calledPlayer.id, team_id:userTeam.id, price:currentBid});
+  if (error) { alert(error.message); return; }
+  soldIds.add(calledPlayer.id);
+  userSoldIds.add(calledPlayer.id);
+  toast(`${calledPlayer.name} acquistato a ${currentBid}!`);
+  closeCallPanel();
+  refreshDashboard();
+  refreshStrategyPanel();
+}
+
+async function assignToOther() {
+  if (!currentAuction || !calledPlayer) return;
+  const panel = document.getElementById('call-panel');
+  const existing = panel.querySelector('.assign-form');
+  if (existing) { existing.remove(); return; }
+  const otherTeams = teamsCache.filter(t => !t.is_user);
+  const form = document.createElement('div');
+  form.className = 'assign-form';
+  form.style.cssText = 'display:flex;gap:8px;align-items:end;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);';
+  form.innerHTML = `
+    <div class="field" style="flex:1;margin:0;"><label>Squadra</label>
+      <select id="assign-team" style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border2);padding:8px;border-radius:var(--radius-sm);font-family:var(--font);font-size:.85rem;">
+        ${otherTeams.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" style="width:80px;margin:0;"><label>Prezzo</label>
+      <input type="number" id="assign-price" value="${currentBid}" min="1" style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border2);padding:8px;border-radius:var(--radius-sm);font-family:var(--font);font-size:.85rem;">
+    </div>
+    <button class="btn btn-sm" onclick="confirmAssign()">Assegna</button>`;
+  panel.appendChild(form);
+}
+
+async function confirmAssign() {
+  const teamId = parseInt(document.getElementById('assign-team').value);
+  const price = parseInt(document.getElementById('assign-price').value);
+  if (!teamId || !price || !calledPlayer) return;
+  const {error} = await sb.from('purchases').insert({auction_id:currentAuction, player_id:calledPlayer.id, team_id:teamId, price});
+  if (error) { alert(error.message); return; }
+  soldIds.add(calledPlayer.id);
+  const team = teamsCache.find(t => t.id === teamId);
+  toast(`${calledPlayer.name} assegnato a ${team?.name} per ${price}`);
+  closeCallPanel();
+  refreshDashboard();
+  refreshStrategyPanel();
+}
+
+function closeCallPanel() {
+  calledPlayer = null;
+  document.getElementById('call-panel').classList.remove('active');
+  document.getElementById('opp-alert').classList.remove('active');
+}
+
+async function refreshStrategyPanel() {
+  if (!currentAuction) {
+    document.getElementById('strategy-section').style.display = 'none';
+    return;
+  }
+  document.getElementById('strategy-section').style.display = '';
+  const {data: purch} = await sb.from('purchases').select('*').eq('auction_id', currentAuction);
+  const allPurch = purch || [];
+  const opponents = getOpponentBudgets(allPurch);
+  const phase = getAuctionPhase(allPurch);
+  const needs = getAllRosterNeeds();
+
+  // Roster needs
+  let needsHtml = '';
+  for (const [role, nd] of Object.entries(needs)) {
+    const badgeCls = nd.urgent ? 'urgent' : nd.remaining > 0 ? 'warn' : 'ok';
+    const label = nd.remaining === 0 ? 'Completo' : nd.urgent ? 'Urgente!' : `${nd.remaining} da prendere`;
+    needsHtml += `<div class="strat-row">
+      <span style="font-weight:700;color:var(--accent);">${role}</span>
+      <span>${nd.have}/${nd.need}</span>
+      <span class="strat-badge ${badgeCls}">${label}</span>
+    </div>`;
+  }
+  document.getElementById('roster-needs').innerHTML = needsHtml;
+  document.getElementById('roster-needs-card').style.display = '';
+
+  // Opponents
+  const userTeam = teamsCache.find(t => t.is_user);
+  let oppHtml = '';
+  const sorted = Object.values(opponents).filter(o => o.team.id !== userTeam?.id).sort((a,b) => b.remaining - a.remaining);
+  for (const o of sorted) {
+    const pctSpent = o.spent / (auctionData?.initial_credits || 500) * 100;
+    const clr = pctSpent > 85 ? 'var(--red)' : pctSpent > 60 ? 'var(--yellow)' : 'var(--green)';
+    oppHtml += `<div class="strat-row">
+      <span style="font-weight:600;">${o.team.name}</span>
+      <div class="team-budget">
+        <span style="color:${clr};font-weight:700;font-variant-numeric:tabular-nums;">${o.remaining}cr</span>
+        <span style="font-size:.72rem;color:var(--text3);">${o.count} acq.</span>
+      </div>
+    </div>`;
+  }
+  document.getElementById('opponent-tracker').innerHTML = oppHtml || '<div style="color:var(--text3);font-size:.82rem;">Nessun dato</div>';
+
+  // Phase
+  const phaseClr = phase.phase === 'inizio' ? 'var(--accent)' : phase.phase === 'meta' ? 'var(--yellow)' : 'var(--red)';
+  document.getElementById('auction-phase').innerHTML = `
+    <div style="font-size:1.3rem;font-weight:800;color:${phaseClr};margin-bottom:6px;">${phase.label}</div>
+    <div style="font-size:.82rem;color:var(--text2);line-height:1.5;">${phase.detail}</div>`;
+
+  // Suggestion
+  renderSuggestion(allPurch, opponents, needs);
+}
+
+function renderSuggestion(allPurch, opponents, needs) {
+  const suggestEl = document.getElementById('suggest-call');
+  const suggestText = document.getElementById('suggest-text');
+  if (!currentAuction) { suggestEl.style.display = 'none'; return; }
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+
+  let urgentRole = null;
+  for (const [role, nd] of Object.entries(needs)) {
+    if (nd.urgent) { urgentRole = role; break; }
+  }
+
+  const lowBudgetTeams = Object.values(opponents).filter(o => o.remaining < (auctionData?.initial_credits||500) * 0.2).length;
+  const totalTeams = teamsCache.length;
+
+  const available = allPlayers.filter(p => !soldIds.has(p.id));
+  const bestByRole = {};
+  for (const p of available) {
+    const ss = seasonMap[p.id] || [];
+    const fma = projectFMA(p, ss);
+    const tier = getPlayerTier(p.id, p.role_classic, tierData);
+    const rtiers = tierData[p.role_classic] || {};
+    const ptd = (rtiers[tier]||[]).find(tp => tp.id === p.id);
+    const adjFma = ptd ? ptd.adjFma : fma;
+    if (!bestByRole[p.role_classic] || adjFma > bestByRole[p.role_classic].adjFma) {
+      bestByRole[p.role_classic] = {player:p, adjFma, tier};
+    }
+  }
+
+  let tip = '';
+  if (urgentRole && bestByRole[urgentRole]) {
+    const b = bestByRole[urgentRole];
+    tip = `<strong>Urgenza ${urgentRole}:</strong> pochi slot rimasti. Chiama <strong>${b.player.name}</strong> (FMA adj ${b.adjFma}, F${b.tier}) — ${lowBudgetTeams}/${totalTeams} squadre a budget basso.`;
+  } else if (lowBudgetTeams >= totalTeams * 0.5) {
+    const best = Object.values(bestByRole).sort((a,b) => b.adjFma - a.adjFma)[0];
+    if (best) tip = `<strong>Momento giusto!</strong> ${lowBudgetTeams} squadre quasi a secco. Chiama <strong>${best.player.name}</strong> (FMA adj ${best.adjFma}) — meno competizione.`;
+  }
+  if (tip) {
+    suggestText.innerHTML = `<div style="font-size:.82rem;line-height:1.5;">${tip}</div>`;
+    suggestEl.style.display = '';
+  } else { suggestEl.style.display = 'none'; }
+}
+
 function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPrice) {
   const infl = inflation[role] || 1;
   const analytical = bp * infl * scarcity;
@@ -999,6 +1471,8 @@ async function loadAuctionPurchases() {
   if (!currentAuction) return [];
   const {data} = await sb.from('purchases').select('*').eq('auction_id', currentAuction).order('created_at', {ascending: false});
   soldIds = new Set((data||[]).map(p => p.player_id));
+  const userTeam = teamsCache.find(t => t.is_user);
+  userSoldIds = new Set((data||[]).filter(p => p.team_id === userTeam?.id).map(p => p.player_id));
   return data || [];
 }
 
@@ -1244,7 +1718,7 @@ function searchPlayers(q) {
     results.sort((a,b) => b.adjFma - a.adjFma);
 
     el.innerHTML = results.map(p => `
-      <div class="sr-item ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
+      <div class="sr-item ${p.sold?'sold':''}" onclick="${p.sold?'':(currentAuction?'callPlayer('+p.id+')':'openPlayer('+p.id+')')}">
         <div>
           <span class="name">${p.name}</span>
           <span class="meta">${p.role_classic} · ${p.team} ${p.is_penalty_taker?'⚽':''}${p.sold?' · VENDUTO':''}</span>
@@ -1548,11 +2022,14 @@ async function refreshDashboard() {
   if (!currentAuction) return;
   refreshPurchases();
   refreshBudget();
+  refreshStrategyPanel();
 }
 
 async function refreshPurchases() {
-  const {data: purchases} = await sb.from('purchases').select('*, players(name,team,role_classic), teams(name)').eq('auction_id', currentAuction).order('created_at', {ascending:false});
+  const {data: purchases} = await sb.from('purchases').select('*, players(name,team,role_classic), teams(name,is_user)').eq('auction_id', currentAuction).order('created_at', {ascending:false});
   soldIds = new Set((purchases||[]).map(p => p.player_id));
+  const userTeam = teamsCache.find(t => t.is_user);
+  userSoldIds = new Set((purchases||[]).filter(p => p.team_id === userTeam?.id).map(p => p.player_id));
   document.getElementById('purchases-log').innerHTML = (purchases||[]).map(p => `
     <tr>
       <td><strong>${p.players?.name||'?'}</strong></td>
@@ -2118,6 +2595,7 @@ document.addEventListener('keydown', (e) => {
 renderSetup();
 loadExistingAuctions();
 loadAllData();
+if (!currentAuction) document.getElementById('strategy-section').style.display = 'none';
 </script>
 </body>
 </html>
