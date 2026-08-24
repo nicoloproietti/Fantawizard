@@ -2,7 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/fantacalcio-app-asta-8nplpf]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
