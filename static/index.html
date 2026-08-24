@@ -280,13 +280,35 @@ header nav button.active {
   background: var(--bg2);
   border: 1px solid var(--border2);
   border-radius: var(--radius-lg);
-  width: 620px;
+  width: 720px;
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
   padding: 28px;
   box-shadow: var(--shadow-lg);
 }
+.chart-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:16px 0; }
+@media(max-width:600px){ .chart-row{grid-template-columns:1fr;} }
+.chart-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.chart-card h4 {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 10px;
+}
+.chart-card svg { display:block; width:100%; }
+.fma-gauge { display:flex; align-items:center; gap:14px; margin:16px 0; padding:14px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); }
+.fma-gauge .gauge-bar { flex:1; height:10px; background:var(--bg); border-radius:5px; overflow:hidden; position:relative; }
+.fma-gauge .gauge-fill { height:100%; border-radius:5px; }
+.fma-gauge .gauge-marker { position:absolute; top:-3px; width:3px; height:16px; background:var(--text); border-radius:2px; transform:translateX(-50%); }
+.fma-gauge .gauge-labels { display:flex; justify-content:space-between; font-size:.65rem; color:var(--text3); margin-top:4px; }
 .modal h2 { margin-bottom:4px; font-weight:700; letter-spacing:-.01em; }
 .modal .subtitle { color:var(--text2); font-size:.85rem; margin-bottom:16px; }
 .stats-grid {
@@ -1073,28 +1095,177 @@ function searchPlayers(q) {
   });
 }
 
+function svgBarChart(seasons, series, height = 120) {
+  if (!seasons.length) return '<div style="color:var(--text3);font-size:.78rem;text-align:center;">Nessun dato</div>';
+  const ss = [...seasons].reverse();
+  const w = 280, h = height, pad = {t:8, r:8, b:24, l:8};
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const maxVal = Math.max(1, ...ss.flatMap(s => series.map(sr => s[sr.key] || 0)));
+  const groupW = iw / ss.length;
+  const barW = Math.min(groupW * 0.35, 18);
+  const gap = series.length > 1 ? 3 : 0;
+  const totalBarW = series.length * barW + (series.length - 1) * gap;
+
+  let bars = '';
+  ss.forEach((s, i) => {
+    const gx = pad.l + i * groupW + (groupW - totalBarW) / 2;
+    series.forEach((sr, si) => {
+      const val = s[sr.key] || 0;
+      const bh = (val / maxVal) * ih;
+      const bx = gx + si * (barW + gap);
+      const by = pad.t + ih - bh;
+      bars += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="2" fill="${sr.color}" opacity="0.9"/>`;
+      if (val > 0) bars += `<text x="${bx + barW/2}" y="${by - 3}" text-anchor="middle" fill="${sr.color}" font-size="9" font-weight="700" font-family="Inter,system-ui">${Number.isInteger(val)?val:val.toFixed(1)}</text>`;
+    });
+    const label = s.season ? s.season.split('-')[0].slice(2) + '/' + s.season.split('-')[1]?.slice(2) : '';
+    bars += `<text x="${pad.l + i * groupW + groupW/2}" y="${h - 4}" text-anchor="middle" fill="#666" font-size="9" font-family="Inter,system-ui">${label}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${pad.l}" y1="${pad.t + ih}" x2="${pad.l + iw}" y2="${pad.t + ih}" stroke="#2a2a2a" stroke-width="1"/>
+    ${bars}
+  </svg>`;
+}
+
+function svgRatingChart(seasons, height = 120) {
+  if (!seasons.length) return '';
+  const ss = [...seasons].reverse();
+  const w = 280, h = height, pad = {t:14, r:12, b:24, l:12};
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const allVals = ss.flatMap(s => [s.avg_rating || 0, s.fanta_avg || 0]).filter(v => v > 0);
+  if (!allVals.length) return '';
+  const minV = Math.min(...allVals) - 0.3, maxV = Math.max(...allVals) + 0.3;
+  const range = maxV - minV || 1;
+
+  const toY = v => pad.t + ih - ((v - minV) / range) * ih;
+  const toX = i => pad.l + (ss.length === 1 ? iw/2 : i * iw / (ss.length - 1));
+
+  let mvPoints = '', fmPoints = '', dots = '';
+  ss.forEach((s, i) => {
+    const x = toX(i);
+    if (s.avg_rating) {
+      const y = toY(s.avg_rating);
+      mvPoints += `${i?'L':'M'}${x},${y} `;
+      dots += `<circle cx="${x}" cy="${y}" r="4" fill="#00e676" stroke="#111" stroke-width="1.5"/>`;
+      dots += `<text x="${x}" y="${y - 8}" text-anchor="middle" fill="#00e676" font-size="9" font-weight="700" font-family="Inter,system-ui">${s.avg_rating}</text>`;
+    }
+    if (s.fanta_avg) {
+      const y = toY(s.fanta_avg);
+      fmPoints += `${i?'L':'M'}${x},${y} `;
+      dots += `<circle cx="${x}" cy="${y}" r="4" fill="#26c6da" stroke="#111" stroke-width="1.5"/>`;
+      dots += `<text x="${x}" y="${y + 14}" text-anchor="middle" fill="#26c6da" font-size="9" font-weight="700" font-family="Inter,system-ui">${s.fanta_avg}</text>`;
+    }
+    const label = s.season ? s.season.split('-')[0].slice(2) + '/' + s.season.split('-')[1]?.slice(2) : '';
+    dots += `<text x="${x}" y="${h - 4}" text-anchor="middle" fill="#666" font-size="9" font-family="Inter,system-ui">${label}</text>`;
+  });
+
+  const gridLines = [5, 5.5, 6, 6.5, 7, 7.5, 8].filter(v => v >= minV && v <= maxV).map(v =>
+    `<line x1="${pad.l}" y1="${toY(v)}" x2="${pad.l+iw}" y2="${toY(v)}" stroke="#1f1f1f" stroke-width="0.5"/>
+     <text x="${pad.l - 2}" y="${toY(v)+3}" text-anchor="end" fill="#444" font-size="7" font-family="Inter,system-ui">${v}</text>`
+  ).join('');
+
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    ${gridLines}
+    <path d="${mvPoints}" fill="none" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${fmPoints}" fill="none" stroke="#26c6da" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3"/>
+    ${dots}
+  </svg>`;
+}
+
+function renderFMAGauge(fma, role, tierData) {
+  const roleTiers = tierData[role] || {};
+  const allFMA = Object.values(roleTiers).flat().map(p => p.fma).filter(f => f > 0);
+  if (!allFMA.length) return '';
+  const minFMA = Math.min(...allFMA), maxFMA = Math.max(...allFMA);
+  const range = maxFMA - minFMA || 1;
+  const pct = Math.max(0, Math.min(100, ((fma - minFMA) / range) * 100));
+  const tierBounds = [85, 60, 30, 0];
+  const colors = ['#00e676', '#26c6da', '#ffd740', '#666'];
+  const segments = tierBounds.map((start, i) => {
+    const end = i === 0 ? 100 : tierBounds[i - 1];
+    return `<div style="position:absolute;left:${100-end}%;width:${end-start}%;height:100%;background:${colors[i]};opacity:.25;"></div>`;
+  }).join('');
+
+  return `<div class="fma-gauge">
+    <div style="text-align:center;min-width:52px;">
+      <div style="font-size:1.4rem;font-weight:800;color:var(--accent);line-height:1;">${fma}</div>
+      <div style="font-size:.65rem;color:var(--text3);margin-top:2px;">FMA</div>
+    </div>
+    <div style="flex:1;">
+      <div class="gauge-bar">
+        ${segments}
+        <div class="gauge-marker" style="left:${pct}%;"></div>
+      </div>
+      <div class="gauge-labels"><span>${minFMA.toFixed(1)}</span><span>Ruolo ${role}</span><span>${maxFMA.toFixed(1)}</span></div>
+    </div>
+  </div>`;
+}
+
 async function openPlayer(id) {
   document.getElementById('search-results').classList.remove('open');
   const pl = allPlayers.find(p => p.id === id);
   if (!pl) return;
   const seasonMap = buildSeasonMap();
   const ss = seasonMap[pl.id] || [];
-  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0);
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
   const tierData = computeTiers(allPlayers, seasonMap);
   const playerMap = buildPlayerMap();
 
-  const {data: purch} = await sb.from('purchases').select('*').eq('auction_id', currentAuction);
-  const infl = computeInflation(purch||[], playerMap, seasonMap);
-  const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
-  const scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
-  const userTeam = teamsCache.find(t => t.is_user);
-  const userPurchases = (purch||[]).filter(p => p.team_id === userTeam?.id);
-  const mb = computeMaxBid(auctionData, userPurchases);
-  const fma = projectFMA(pl, ss);
-  const bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
-  const rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb);
+  let infl = {}, tier = 4, scarcity = 1, mb = 999, fma = 0, bp = 0, rec = 0;
+  let purch = [];
 
-  const teamOpts = teamsCache.map(t => `<option value="${t.id}" ${t.is_user?'selected':''}>${t.name}</option>`).join('');
+  if (currentAuction) {
+    const res = await sb.from('purchases').select('*').eq('auction_id', currentAuction);
+    purch = res.data || [];
+    infl = computeInflation(purch, playerMap, seasonMap);
+    const userTeam = teamsCache.find(t => t.is_user);
+    const userPurchases = purch.filter(p => p.team_id === userTeam?.id);
+    mb = computeMaxBid(auctionData, userPurchases);
+    fma = projectFMA(pl, ss);
+    bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
+    tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+    scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
+    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb);
+  } else {
+    if (!Object.keys(bonusMap).length) {
+      for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
+    }
+    fma = projectFMA(pl, ss);
+    tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+  }
+
+  const isGoalkeeper = pl.role_classic === 'P';
+  const goalSeries = isGoalkeeper
+    ? [{key:'goals_conceded', color:'#ff5252'}, {key:'clean_sheets', color:'#00e676'}]
+    : [{key:'goals', color:'#00e676'}, {key:'assists', color:'#26c6da'}];
+  const goalTitle = isGoalkeeper ? 'Gol subiti / Clean sheet' : 'Gol / Assist';
+
+  const chartLegend = (items) => items.map(it =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.68rem;color:var(--text2);"><span style="width:8px;height:8px;border-radius:2px;background:${it.color};display:inline-block;"></span>${it.label}</span>`
+  ).join(' &nbsp; ');
+
+  const gaugeHtml = renderFMAGauge(fma, pl.role_classic, tierData);
+
+  const purchaseHtml = currentAuction ? `
+    <div class="purchase-form">
+      <div class="field"><label>Prezzo</label><input type="number" id="buy-price" min="1" value="${rec}"></div>
+      <div class="field"><label>Acquirente</label><select id="buy-team">${teamsCache.map(t => `<option value="${t.id}" ${t.is_user?'selected':''}>${t.name}</option>`).join('')}</select></div>
+      <button class="btn" onclick="buyPlayer(${pl.id})">Compra</button>
+    </div>` : '';
+
+  const statsGridHtml = currentAuction ? `
+    <div class="stats-grid">
+      <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
+      <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
+    </div>` : `
+    <div class="stats-grid">
+      <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price || '-'}</div><div class="lbl">Quotazione</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].appearances : '-'}</div><div class="lbl">Presenze</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].avg_rating : '-'}</div><div class="lbl">Media voto</div></div>
+    </div>`;
 
   document.getElementById('modal-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:start;">
@@ -1104,25 +1275,38 @@ async function openPlayer(id) {
       </div>
       <button onclick="document.getElementById('player-modal').classList.remove('open')" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;font-family:var(--font);">&#x2715;</button>
     </div>
-    <div class="stats-grid">
-      <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
-      <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
-      <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
-      <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
+    ${statsGridHtml}
+    ${gaugeHtml}
+    <div class="chart-row">
+      <div class="chart-card">
+        <h4>${goalTitle}</h4>
+        ${chartLegend(goalSeries.map(s => ({color:s.color, label: isGoalkeeper ? (s.key==='goals_conceded'?'Gol subiti':'Clean sheet') : (s.key==='goals'?'Gol':'Assist')})))}
+        ${svgBarChart(ss, goalSeries)}
+      </div>
+      <div class="chart-card">
+        <h4>Media voto / Fantamedia</h4>
+        ${chartLegend([{color:'#00e676', label:'MV'}, {color:'#26c6da', label:'FM'}])}
+        ${svgRatingChart(ss)}
+      </div>
     </div>
-    <h3 style="font-size:.9rem;margin:12px 0 8px;">Ultime stagioni</h3>
-    <table class="log-table">
-      <thead><tr><th>Stagione</th><th>Pres.</th><th>MV</th><th>FM</th><th>Gol</th><th>Assist</th><th>Amm</th></tr></thead>
-      <tbody>${ss.map(s => `<tr><td>${s.season}</td><td>${s.appearances}</td><td>${s.avg_rating}</td><td>${s.fanta_avg}</td><td>${s.goals}</td><td>${s.assists}</td><td>${s.yellow_cards}</td></tr>`).join('')}</tbody>
-    </table>
-    <div class="purchase-form">
-      <div class="field"><label>Prezzo</label><input type="number" id="buy-price" min="1" value="${rec}"></div>
-      <div class="field"><label>Acquirente</label><select id="buy-team">${teamOpts}</select></div>
-      <button class="btn" onclick="buyPlayer(${pl.id})">Compra</button>
-    </div>
+    ${ss.length ? `<div style="overflow-x:auto;">
+    <table class="log-table" style="margin-bottom:4px;">
+      <thead><tr><th>Stagione</th><th>Pres</th><th>MV</th><th>FM</th><th>${isGoalkeeper?'GS':'Gol'}</th><th>${isGoalkeeper?'Rp':'Ass'}</th><th>Amm</th><th>Esp</th></tr></thead>
+      <tbody>${ss.map(s => `<tr>
+        <td style="font-weight:600;">${s.season}</td>
+        <td>${s.appearances||0}</td>
+        <td>${s.avg_rating||'-'}</td>
+        <td>${s.fanta_avg||'-'}</td>
+        <td>${isGoalkeeper ? (s.goals_conceded||0) : (s.goals||0)}</td>
+        <td>${isGoalkeeper ? (s.penalties_saved||0) : (s.assists||0)}</td>
+        <td>${s.yellow_cards||0}</td>
+        <td>${s.red_cards||0}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>` : ''}
+    ${purchaseHtml}
   `;
   document.getElementById('player-modal').classList.add('open');
-  setTimeout(() => { document.getElementById('buy-price').focus(); document.getElementById('buy-price').select(); }, 100);
+  if (currentAuction) setTimeout(() => { const bp = document.getElementById('buy-price'); if(bp){bp.focus();bp.select();} }, 100);
 }
 
 async function buyPlayer(playerId) {
