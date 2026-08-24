@@ -3122,17 +3122,21 @@ async function openPlayer(id) {
     </div>
     ${ss.length ? `<div style="overflow-x:auto;">
     <table class="log-table" style="margin-bottom:4px;">
-      <thead><tr><th>Stagione</th><th>Pres</th><th>Tit</th><th>Sub</th><th>MV</th><th>FM</th><th>${isGoalkeeper?'GS':'Gol'}</th><th>${isGoalkeeper?'Rp':'Ass'}</th><th>Amm</th><th>Esp</th></tr></thead>
+      <thead><tr><th>Stagione</th><th>Pres</th><th>Tit</th><th>Sub</th><th>% Tit</th><th>MV</th><th>FM</th><th>${isGoalkeeper?'GS':'Gol'}</th><th>${isGoalkeeper?'Rp':'Ass'}</th><th>Amm</th><th>Esp</th></tr></thead>
       <tbody>${ss.map(s => {
         const app = s.appearances||0;
-        const sp = s.starter_pct||0;
+        let sp = s.starter_pct||0;
+        if (!sp && s.minutes && app > 0) sp = Math.min(100, Math.round((s.minutes / app) / 90 * 100));
         const tit = sp > 0 ? Math.round(app * sp / 100) : '-';
         const sub = sp > 0 ? app - Math.round(app * sp / 100) : '-';
+        const barW = sp > 0 ? sp : 0;
+        const barHtml = sp > 0 ? `<div style="display:flex;align-items:center;gap:4px;"><div style="width:40px;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;"><div style="width:${barW}%;height:100%;background:${sp>=70?'var(--green)':sp>=40?'var(--yellow)':'var(--red)'};border-radius:3px;"></div></div><span style="font-size:.65rem;color:var(--text3);">${sp}%</span></div>` : '';
         return `<tr>
         <td style="font-weight:600;">${s.season}</td>
         <td>${app}</td>
         <td style="color:var(--green);">${tit}</td>
         <td style="color:var(--yellow);">${sub}</td>
+        <td>${barHtml}</td>
         <td>${s.avg_rating||'-'}</td>
         <td>${s.fanta_avg||'-'}</td>
         <td>${isGoalkeeper ? (s.goals_conceded||0) : (s.goals||0)}</td>
@@ -3382,6 +3386,8 @@ const STAT_COL_MAP = {
   'pi':'clean_sheets','porta inviolata':'clean_sheets',
   'ass f':'assists_set_piece','assist fermo':'assists_set_piece',
   'tit':'starter_pct','% tit':'starter_pct','tit%':'starter_pct','titolare':'starter_pct',
+  'tit da':'_games_started','da titolare':'_games_started','games started':'_games_started',
+  'sub':'_games_sub','da subentrato':'_games_sub','subentrato':'_games_sub',
 };
 
 function parseFile(file) {
@@ -3731,6 +3737,21 @@ async function importStats(file) {
         const missed = parseInt((row[colMap._penalties_missed]||'0').toString()) || 0;
         const scored = statData.penalties_scored || 0;
         statData.penalties_taken = scored + missed;
+      }
+
+      if (!statData.starter_pct) {
+        if (colMap._games_started !== undefined) {
+          const gs = parseInt((row[colMap._games_started]||'0').toString()) || 0;
+          const app = statData.appearances || 0;
+          if (app > 0) statData.starter_pct = Math.min(100, Math.round(gs / app * 100));
+        } else if (colMap._games_sub !== undefined) {
+          const sub = parseInt((row[colMap._games_sub]||'0').toString()) || 0;
+          const app = statData.appearances || 0;
+          if (app > 0) statData.starter_pct = Math.min(100, Math.max(0, Math.round((app - sub) / app * 100)));
+        } else if (statData.minutes && statData.appearances) {
+          const avgMin = statData.minutes / statData.appearances;
+          statData.starter_pct = Math.min(100, Math.round(avgMin / 90 * 100));
+        }
       }
 
       const {data: existing} = await sb.from('player_seasons').select('id')
