@@ -889,17 +889,33 @@ function computeInflation(purchases, playerMap, seasonMap) {
   return inflation;
 }
 
+function computeReliability(appearances, sortedApps) {
+  const n = sortedApps.length;
+  if (n === 0 || appearances < 1) return 0.3;
+  let rank = sortedApps.findIndex(a => appearances >= a);
+  if (rank === -1) rank = n;
+  const pctile = 1 - rank / n;
+  if (pctile >= 0.5) return 1.0;
+  return 0.3 + pctile * 1.4;
+}
+
 function computeTiers(players, seasonMap) {
   const byRole = {};
   for (const pl of players) {
     const ss = seasonMap[pl.id] || [];
     const fma = projectFMA(pl, ss);
+    const apps = weightedStat(ss, 'appearances');
     if (!byRole[pl.role_classic]) byRole[pl.role_classic] = [];
-    byRole[pl.role_classic].push({...pl, fma});
+    byRole[pl.role_classic].push({...pl, fma, apps});
   }
   const result = {};
   for (const [role, items] of Object.entries(byRole)) {
-    items.sort((a,b) => b.fma - a.fma);
+    const sortedApps = items.map(p => p.apps).sort((a,b) => b - a);
+    for (const p of items) {
+      p.reliability = computeReliability(p.apps, sortedApps);
+      p.adjFma = Math.round(p.fma * p.reliability * 100) / 100;
+    }
+    items.sort((a,b) => b.adjFma - a.adjFma);
     const n = items.length;
     const tiers = {1:[], 2:[], 3:[], 4:[]};
     items.forEach((p, i) => {
@@ -1214,14 +1230,18 @@ function searchPlayers(q) {
     const results = filtered.map(pl => {
       const ss = seasonMap[pl.id] || [];
       const fma = projectFMA(pl, ss);
-      const bp = basePrice(fma, pl.role_classic, credits, numTeams, totalSlots);
       const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
-      const scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
+      const roleTiers = tierData[pl.role_classic] || {};
+      const tList = roleTiers[tier] || [];
+      const ptd = tList.find(tp => tp.id === pl.id);
+      const adjFma = ptd ? ptd.adjFma : fma;
+      const bp = basePrice(adjFma, pl.role_classic, credits, numTeams, totalSlots);
+      const scarcity = computeScarcity(tier, roleTiers);
       const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
       const rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, mkt);
-      return {...pl, fma, bp, rec, tier, mb, mkt, sold: soldIds.has(pl.id)};
+      return {...pl, fma, adjFma, bp, rec, tier, mb, mkt, sold: soldIds.has(pl.id)};
     });
-    results.sort((a,b) => b.fma - a.fma);
+    results.sort((a,b) => b.adjFma - a.adjFma);
 
     el.innerHTML = results.map(p => `
       <div class="sr-item ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
@@ -1362,10 +1382,18 @@ async function openPlayer(id) {
   const tierData = computeTiers(allPlayers, seasonMap);
   const playerMap = buildPlayerMap();
 
-  let infl = {}, tier = 4, scarcity = 1, mb = 999, fma = 0, bp = 0, rec = 0;
+  let infl = {}, tier = 4, scarcity = 1, mb = 999, fma = 0, bp = 0, rec = 0, reliability = 1, adjFma = 0;
   let purch = [];
 
   const credits = getActiveCredits();
+  fma = projectFMA(pl, ss);
+  tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+  const roleTiers = tierData[pl.role_classic] || {};
+  const tierList = roleTiers[tier] || [];
+  const plTier = tierList.find(tp => tp.id === pl.id);
+  reliability = plTier ? plTier.reliability : 1;
+  adjFma = plTier ? plTier.adjFma : fma;
+
   if (currentAuction) {
     const res = await sb.from('purchases').select('*').eq('auction_id', currentAuction);
     purch = res.data || [];
@@ -1373,19 +1401,15 @@ async function openPlayer(id) {
     const userTeam = teamsCache.find(t => t.is_user);
     const userPurchases = purch.filter(p => p.team_id === userTeam?.id);
     mb = computeMaxBid(auctionData, userPurchases);
-    fma = projectFMA(pl, ss);
-    bp = basePrice(fma, pl.role_classic, credits, auctionData.num_teams, totalSlots);
-    tier = getPlayerTier(pl.id, pl.role_classic, tierData);
-    scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
+    bp = basePrice(adjFma, pl.role_classic, credits, auctionData.num_teams, totalSlots);
+    scarcity = computeScarcity(tier, roleTiers);
     rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, scaleMarketPrice(pl.avg_auction_price, credits));
   } else {
     if (!Object.keys(bonusMap).length) {
       for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
     }
-    fma = projectFMA(pl, ss);
-    bp = basePrice(fma, pl.role_classic, credits, 10, totalSlots);
-    tier = getPlayerTier(pl.id, pl.role_classic, tierData);
-    scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
+    bp = basePrice(adjFma, pl.role_classic, credits, 10, totalSlots);
+    scarcity = computeScarcity(tier, roleTiers);
     rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, scaleMarketPrice(pl.avg_auction_price, credits));
   }
 
@@ -1399,7 +1423,7 @@ async function openPlayer(id) {
     `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.68rem;color:var(--text2);"><span style="width:8px;height:8px;border-radius:2px;background:${it.color};display:inline-block;"></span>${it.label}</span>`
   ).join(' &nbsp; ');
 
-  const gaugeHtml = renderFMAGauge(fma, pl.role_classic, tierData);
+  const gaugeHtml = renderFMAGauge(adjFma, pl.role_classic, tierData);
 
   const purchaseHtml = currentAuction ? `
     <div class="purchase-form">
@@ -1415,20 +1439,24 @@ async function openPlayer(id) {
     ? `${mktScaled}<span style="font-size:.65rem;color:var(--text3);font-weight:400;display:block;">${mktRaw}@${FVM_REF_CREDITS}cr</span>`
     : `${mktScaled}`) : '-';
   const mktLabel = isScaled ? `Media aste (${credits}cr)` : 'Media aste';
+  const relPct = Math.round(reliability * 100);
+  const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
   const statsGridHtml = currentAuction ? `
-    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
-      <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
+    <div class="stats-grid" style="grid-template-columns:repeat(6,1fr);">
+      <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA grezza</div></div>
+      <div class="stat-box"><div class="val" style="color:${relClr};">${relPct}%</div><div class="lbl">Affidabilità</div></div>
+      <div class="stat-box"><div class="val">${adjFma}</div><div class="lbl">FMA adj</div></div>
       <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
       <div class="stat-box"><div class="val" style="color:#26c6da;">${mktValHtml}</div><div class="lbl">${mktLabel}</div></div>
-      <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
       <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
     </div>` : `
-    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
-      <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
+    <div class="stats-grid" style="grid-template-columns:repeat(6,1fr);">
+      <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA grezza</div></div>
+      <div class="stat-box"><div class="val" style="color:${relClr};">${relPct}%</div><div class="lbl">Affidabilità</div></div>
+      <div class="stat-box"><div class="val">${adjFma}</div><div class="lbl">FMA adj</div></div>
       <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
       <div class="stat-box"><div class="val" style="color:#26c6da;">${mktValHtml}</div><div class="lbl">${mktLabel}</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price || '-'}</div><div class="lbl">Quotazione</div></div>
-      <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].avg_rating : '-'}</div><div class="lbl">Media voto</div></div>
     </div>`;
 
   document.getElementById('modal-content').innerHTML = `
@@ -1601,10 +1629,17 @@ function showTierRole(role) {
   for (let t = 1; t <= 4; t++) {
     const players = roleTiers[t] || [];
     html += `<div class="tier-col t${t}"><h3>Fascia ${t} — ${labels[t]}</h3>
-      ${players.map(p => `<div class="tier-player ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
+      ${players.map(p => {
+        const relPct = Math.round(p.reliability * 100);
+        const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
+        return `<div class="tier-player ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
         <span>${p.name} <span style="color:var(--text2);font-size:.75rem;">${p.team}</span></span>
-        <span class="fma">${p.fma}</span>
-      </div>`).join('')}
+        <span style="display:flex;gap:8px;align-items:center;">
+          <span title="Affidabilità ${relPct}% (pres. ${Math.round(p.apps)})" style="font-size:.65rem;color:${relClr};font-weight:600;">${relPct}%</span>
+          <span class="fma">${p.adjFma}</span>
+        </span>
+      </div>`;
+      }).join('')}
     </div>`;
   }
   document.getElementById('tier-display').innerHTML = html;
@@ -1720,7 +1755,7 @@ function fuzzyMatch(name, candidates, threshold=0.6) {
 }
 
 // ── Players DB ──
-let dbSort = {col:'fma', dir:'desc'};
+let dbSort = {col:'adjFma', dir:'desc'};
 let dbRole = 'ALL';
 let dbSearch = '';
 let dbTeam = '';
@@ -1730,6 +1765,8 @@ const DB_COLS = [
   {key:'team', label:'Squadra', cls:'team-col'},
   {key:'role_classic', label:'R', cls:''},
   {key:'fma', label:'FMA', cls:'num-col', num:true},
+  {key:'reliability', label:'Affid.', cls:'num-col', num:true},
+  {key:'adjFma', label:'FMA adj', cls:'num-col', num:true},
   {key:'rec', label:'Consigliato', cls:'num-col', num:true},
   {key:'mkt', label:'Media aste', cls:'num-col', num:true},
   {key:'initial_price', label:'Quot.', cls:'num-col', num:true},
@@ -1752,15 +1789,21 @@ function renderPlayersDB() {
     const ss = seasonMap[pl.id] || [];
     const s0 = ss[0] || {};
     const fma = projectFMA(pl, ss);
-    const bp = basePrice(fma, pl.role_classic, credits, numTeams, totalSlots);
     const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
-    const scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
+    const roleTiers = tierData[pl.role_classic] || {};
+    const tierList = roleTiers[tier] || [];
+    const plTier = tierList.find(tp => tp.id === pl.id);
+    const reliability = plTier ? plTier.reliability : 1;
+    const adjFma = plTier ? plTier.adjFma : fma;
+    const bp = basePrice(adjFma, pl.role_classic, credits, numTeams, totalSlots);
+    const scarcity = computeScarcity(tier, roleTiers);
     const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
     const rec = recommendedPrice(bp, pl.role_classic, tier, {}, scarcity, 999, mkt);
     teamSet.add(pl.team);
     return {
       id:pl.id, name:pl.name, team:pl.team, role_classic:pl.role_classic,
-      fma, rec, mkt: mkt||0, initial_price:pl.initial_price||0,
+      fma, reliability: Math.round(reliability * 100), adjFma, rec, mkt: mkt||0,
+      initial_price:pl.initial_price||0,
       avg_rating: s0.avg_rating||0, fanta_avg: s0.fanta_avg||0,
       appearances: s0.appearances||0, goals: s0.goals||0, assists: s0.assists||0,
       tier, is_penalty_taker:pl.is_penalty_taker, sold:soldIds.has(pl.id),
@@ -1795,11 +1838,14 @@ function renderPlayersDB() {
 
   document.getElementById('db-tbody').innerHTML = filtered.map(r => {
     const tierCls = `t${r.tier}`;
+    const relClr = r.reliability >= 90 ? 'var(--green)' : r.reliability >= 70 ? 'var(--yellow)' : 'var(--red)';
     return `<tr onclick="openPlayer(${r.id})" class="${r.sold?'sold':''}">
       <td class="player-name">${r.name} ${r.is_penalty_taker?'<span title="Rigorista" style="color:var(--yellow);">&#9917;</span>':''}</td>
       <td class="team-col">${r.team}</td>
       <td><span class="price-tag ${tierCls}" style="font-size:.7rem;padding:2px 8px;">${r.role_classic}</span></td>
       <td class="num-col" style="font-weight:700;color:var(--accent);">${r.fma}</td>
+      <td class="num-col" style="font-weight:600;color:${relClr};">${r.reliability}%</td>
+      <td class="num-col" style="font-weight:700;color:var(--accent);">${r.adjFma}</td>
       <td class="num-col" style="font-weight:700;color:var(--green);">${r.rec}</td>
       <td class="num-col" style="color:#26c6da;">${r.mkt||'-'}</td>
       <td class="num-col">${r.initial_price||'-'}</td>
