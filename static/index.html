@@ -581,8 +581,28 @@ async function loadExistingAuctions() {
   el.innerHTML = '<h2 style="margin-bottom:10px;">Aste esistenti</h2>' +
     data.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px;">
       <span><strong>${a.name}</strong> — ${a.num_teams} squadre, ${a.initial_credits} crediti</span>
-      <button class="btn btn-sm" onclick="loadAuction(${a.id})">Apri</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" onclick="loadAuction(${a.id})">Apri</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteAuction(${a.id}, '${a.name.replace(/'/g,"\\'")}')">Elimina</button>
+      </div>
     </div>`).join('');
+}
+
+async function deleteAuction(id, name) {
+  if (!confirm(`Eliminare l'asta "${name}" e tutti i suoi dati?`)) return;
+  await Promise.all([
+    sb.from('purchases').delete().eq('auction_id', id),
+    sb.from('watchlist').delete().eq('auction_id', id),
+    sb.from('teams').delete().eq('auction_id', id),
+    sb.from('budget_splits').delete().eq('auction_id', id),
+    sb.from('modifiers').delete().eq('auction_id', id),
+    sb.from('bonus_rules').delete().eq('auction_id', id),
+    sb.from('roster_slots').delete().eq('auction_id', id),
+  ]);
+  await sb.from('auctions').delete().eq('id', id);
+  if (currentAuction === id) { currentAuction = null; auctionData = null; }
+  toast('Asta eliminata');
+  loadExistingAuctions();
 }
 
 async function createAuction() {
