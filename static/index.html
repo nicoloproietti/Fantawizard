@@ -3844,15 +3844,15 @@ function renderWelcome() {
     <h1>FantaWizard</h1>
     <div class="welcome-sub">Il tuo assistente per l'asta del fantacalcio.<br>Segui questi passi per iniziare.</div>
     <div class="welcome-steps">
-      <div class="welcome-step ${hasAuction?'done':''}" onclick="${hasAuction?'':'navigateTo(\\'setup\\')'}" style="${hasAuction?'':'cursor:pointer;'}">
+      <div class="welcome-step ${hasAuction?'done':''}" onclick="${hasAuction?'':'navigateTo(\'setup\')'}" style="${hasAuction?'':'cursor:pointer;'}">
         <div class="welcome-step-num">${hasAuction?'&#10003;':'1'}</div>
         <div class="welcome-step-text"><strong>Crea la tua asta</strong><span>Configura squadre, crediti, bonus e moduli</span></div>
       </div>
-      <div class="welcome-step ${hasData?'done':''}" onclick="${hasData?'':hasAuction?'navigateTo(\\'data\\')':''}" style="${!hasData&&hasAuction?'cursor:pointer;':''}">
+      <div class="welcome-step ${hasData?'done':''}" onclick="${hasData?'':hasAuction?'navigateTo(\'data\')':''}" style="${!hasData&&hasAuction?'cursor:pointer;':''}">
         <div class="welcome-step-num">${hasData?'&#10003;':'2'}</div>
         <div class="welcome-step-text"><strong>Importa le quotazioni</strong><span>Carica il listone da Fantacalcio.it o Fantagazzetta</span></div>
       </div>
-      <div class="welcome-step ${hasSeasons?'done':''}" onclick="${hasSeasons?'':hasAuction?'navigateTo(\\'data\\')':''}" style="${!hasSeasons&&hasAuction?'cursor:pointer;':''}">
+      <div class="welcome-step ${hasSeasons?'done':''}" onclick="${hasSeasons?'':hasAuction?'navigateTo(\'data\')':''}" style="${!hasSeasons&&hasAuction?'cursor:pointer;':''}">
         <div class="welcome-step-num">${hasSeasons?'&#10003;':'3'}</div>
         <div class="welcome-step-text"><strong>Importa le statistiche</strong><span>Almeno una stagione per le proiezioni FMA</span></div>
       </div>
