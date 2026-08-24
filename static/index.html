@@ -6,120 +6,456 @@
 <title>FantaWizard</title>
 <script src="supabase.min.js"></script>
 <script src="xlsx.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0f1117;
-  --bg2: #1a1d28;
-  --bg3: #242736;
-  --text: #e8eaf0;
-  --text2: #9ca3b4;
-  --accent: #6c5ce7;
-  --accent2: #a29bfe;
-  --green: #00b894;
-  --yellow: #fdcb6e;
-  --red: #e17055;
-  --border: #2d3045;
-  --radius: 8px;
-  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --bg: #080808;
+  --bg2: #111111;
+  --bg3: #1a1a1a;
+  --bg4: #222222;
+  --text: #f0f0f0;
+  --text2: #777;
+  --text3: #555;
+  --accent: #00e676;
+  --accent2: #69f0ae;
+  --accent-dim: rgba(0,230,118,.08);
+  --accent-dim2: rgba(0,230,118,.15);
+  --green: #00e676;
+  --yellow: #ffd740;
+  --red: #ff5252;
+  --border: #1f1f1f;
+  --border2: #2a2a2a;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --shadow: 0 2px 12px rgba(0,0,0,.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.6);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); min-height:100vh; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height:100vh; -webkit-font-smoothing:antialiased; }
 a { color: var(--accent2); text-decoration: none; }
+::selection { background: var(--accent-dim2); color: var(--accent); }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
 
-.container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
-header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 0; position:sticky; top:0; z-index:100; }
-header .container { display:flex; align-items:center; gap:20px; }
-header h1 { font-size:1.4rem; color:var(--accent2); white-space:nowrap; }
-header nav { display:flex; gap:8px; flex-wrap:wrap; }
-header nav button { background:var(--bg3); color:var(--text2); border:1px solid var(--border); padding:6px 14px; border-radius:var(--radius); cursor:pointer; font-size:.85rem; transition:.15s; }
-header nav button:hover, header nav button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
 
-.view { display:none; padding: 20px 0; }
+header {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+header .container {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 56px;
+}
+header h1 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+  margin-right: 32px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+header nav {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+header nav button {
+  background: transparent;
+  color: var(--text2);
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 500;
+  font-family: var(--font);
+  transition: all .15s;
+  position: relative;
+  letter-spacing: .01em;
+}
+header nav button:hover {
+  color: var(--text);
+  background: var(--bg3);
+}
+header nav button.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.view { display:none; padding: 28px 0; }
 .view.active { display:block; }
 
 .setup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
 @media(max-width:800px){ .setup-grid{grid-template-columns:1fr;} }
-.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
-.card h2 { font-size:1.1rem; margin-bottom:14px; color:var(--accent2); }
-.field { margin-bottom:12px; }
-.field label { display:block; font-size:.8rem; color:var(--text2); margin-bottom:4px; }
-.field input, .field select { width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border); padding:8px 10px; border-radius:var(--radius); font-size:.9rem; }
-.field input:focus, .field select:focus { outline:none; border-color:var(--accent); }
-.btn { background:var(--accent); color:#fff; border:none; padding:10px 24px; border-radius:var(--radius); cursor:pointer; font-size:.9rem; font-weight:600; transition:.15s; }
-.btn:hover { background:var(--accent2); }
-.btn-sm { padding:5px 12px; font-size:.8rem; }
-.btn-danger { background:var(--red); }
 
-.bonus-table { width:100%; border-collapse:collapse; font-size:.85rem; }
-.bonus-table th { text-align:left; padding:6px 8px; color:var(--text2); border-bottom:1px solid var(--border); font-weight:500; }
-.bonus-table td { padding:5px 8px; border-bottom:1px solid var(--border); }
-.bonus-table input[type=number] { width:60px; background:var(--bg3); color:var(--text); border:1px solid var(--border); padding:4px 6px; border-radius:4px; text-align:center; }
-.bonus-table input[type=checkbox] { accent-color:var(--accent); }
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+.card h2 {
+  font-size: .95rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+.field { margin-bottom: 14px; }
+.field label {
+  display: block;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.field input, .field select {
+  width: 100%;
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: .88rem;
+  font-family: var(--font);
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 10px 24px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: .85rem;
+  font-weight: 700;
+  font-family: var(--font);
+  transition: all .15s;
+  letter-spacing: .01em;
+}
+.btn:hover { background: var(--accent2); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-sm { padding: 6px 14px; font-size: .78rem; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { background: #ff7070; }
+.btn-ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 6px 14px;
+  font-size: .78rem;
+}
+.btn-ghost:hover { background: var(--accent-dim); }
 
-.dash-top { display:grid; grid-template-columns:1fr 300px; gap:20px; margin-bottom:20px; }
+.bonus-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.bonus-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--text3);
+  font-size: .7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+}
+.bonus-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.bonus-table input[type=number] {
+  width: 60px;
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  padding: 4px 6px;
+  border-radius: 4px;
+  text-align: center;
+  font-family: var(--font);
+  font-size: .82rem;
+}
+.bonus-table input[type=checkbox] { accent-color: var(--accent); width:16px; height:16px; }
+
+.dash-top { display:grid; grid-template-columns:1fr 320px; gap:24px; margin-bottom:24px; }
 @media(max-width:900px){ .dash-top{grid-template-columns:1fr;} }
 
 .search-box { position:relative; }
-.search-box input { width:100%; padding:12px 16px; font-size:1.1rem; background:var(--bg2); color:var(--text); border:2px solid var(--border); border-radius:var(--radius); }
-.search-box input:focus { border-color:var(--accent); outline:none; }
-.search-results { position:absolute; top:100%; left:0; right:0; background:var(--bg2); border:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); max-height:400px; overflow-y:auto; z-index:50; display:none; }
+.search-box input {
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 1.15rem;
+  font-weight: 500;
+  background: var(--bg2);
+  color: var(--text);
+  border: 2px solid var(--border2);
+  border-radius: var(--radius-lg);
+  font-family: var(--font);
+  transition: all .2s;
+}
+.search-box input::placeholder { color: var(--text3); }
+.search-box input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--accent-dim), var(--shadow);
+}
+.search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  max-height: 440px;
+  overflow-y: auto;
+  z-index: 50;
+  display: none;
+  box-shadow: var(--shadow-lg);
+}
 .search-results.open { display:block; }
-.sr-item { padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); transition:.1s; }
-.sr-item:hover { background:var(--bg3); }
-.sr-item .name { font-weight:600; }
-.sr-item .meta { font-size:.8rem; color:var(--text2); }
-.sr-item .price-tag { font-size:.85rem; font-weight:700; padding:2px 8px; border-radius:4px; }
-.sr-item .price-tag.t1 { background:var(--green); color:#000; }
-.sr-item .price-tag.t2 { background:var(--accent2); color:#000; }
-.sr-item .price-tag.t3 { background:var(--yellow); color:#000; }
-.sr-item .price-tag.t4 { background:var(--text2); color:#000; }
-.sr-item.sold { opacity:.4; }
+.sr-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.sr-item:last-child { border-bottom:none; }
+.sr-item:hover { background: var(--bg3); }
+.sr-item .name { font-weight: 600; font-size:.9rem; }
+.sr-item .meta { font-size: .78rem; color: var(--text2); margin-left:8px; }
+.sr-item .price-tag {
+  font-size: .75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: .02em;
+}
+.sr-item .price-tag.t1 { background: var(--green); color:#000; }
+.sr-item .price-tag.t2 { background: #26c6da; color:#000; }
+.sr-item .price-tag.t3 { background: var(--yellow); color:#000; }
+.sr-item .price-tag.t4 { background: var(--text3); color:#ddd; }
+.sr-item.sold { opacity:.3; }
+.sr-item .rec-price {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
 
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
 .modal-overlay.open { display:flex; }
-.modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; width:600px; max-width:95vw; max-height:90vh; overflow-y:auto; padding:24px; }
-.modal h2 { margin-bottom:4px; }
-.modal .subtitle { color:var(--text2); font-size:.9rem; margin-bottom:16px; }
-.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(100px,1fr)); gap:10px; margin:16px 0; }
-.stat-box { background:var(--bg3); padding:10px; border-radius:var(--radius); text-align:center; }
-.stat-box .val { font-size:1.3rem; font-weight:700; color:var(--accent2); }
-.stat-box .lbl { font-size:.7rem; color:var(--text2); margin-top:2px; }
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  width: 620px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  box-shadow: var(--shadow-lg);
+}
+.modal h2 { margin-bottom:4px; font-weight:700; letter-spacing:-.01em; }
+.modal .subtitle { color:var(--text2); font-size:.85rem; margin-bottom:16px; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 18px 0;
+}
+@media(max-width:500px){ .stats-grid{grid-template-columns:repeat(2,1fr);} }
+.stat-box {
+  background: var(--bg3);
+  padding: 14px 10px;
+  border-radius: var(--radius);
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.stat-box .val { font-size: 1.5rem; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.stat-box .lbl { font-size: .68rem; color: var(--text2); margin-top: 3px; text-transform: uppercase; letter-spacing: .03em; font-weight: 500; }
 
-.purchase-form { display:flex; gap:10px; align-items:end; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+.purchase-form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
 .purchase-form .field { margin:0; flex:1; }
+.purchase-form .btn { padding: 10px 28px; }
 
-.budget-bars { display:flex; flex-direction:column; gap:8px; }
-.budget-bar-row { display:flex; align-items:center; gap:8px; font-size:.85rem; }
-.budget-bar-row .role-label { width:20px; font-weight:700; color:var(--accent2); }
-.budget-bar-row .bar-bg { flex:1; height:18px; background:var(--bg3); border-radius:9px; overflow:hidden; }
-.budget-bar-row .bar-fill { height:100%; border-radius:9px; transition:width .3s; }
-.budget-bar-row .bar-nums { width:100px; text-align:right; color:var(--text2); font-size:.8rem; }
+.budget-bars { display:flex; flex-direction:column; gap:10px; }
+.budget-bar-row { display:flex; align-items:center; gap:10px; font-size:.82rem; }
+.budget-bar-row .role-label {
+  width: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  font-size: .8rem;
+}
+.budget-bar-row .bar-bg {
+  flex: 1;
+  height: 20px;
+  background: var(--bg3);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.budget-bar-row .bar-fill { height:100%; border-radius:10px; transition:width .3s ease; }
+.budget-bar-row .bar-nums {
+  width: 105px;
+  text-align: right;
+  color: var(--text2);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
 
-.log-table { width:100%; border-collapse:collapse; font-size:.85rem; }
-.log-table th { text-align:left; padding:8px; color:var(--text2); border-bottom:1px solid var(--border); }
-.log-table td { padding:6px 8px; border-bottom:1px solid var(--border); }
-.log-table .undo-btn { background:none; border:none; color:var(--red); cursor:pointer; font-size:.8rem; }
+.log-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.log-table th {
+  text-align: left;
+  padding: 10px 10px;
+  color: var(--text3);
+  font-size: .7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border2);
+}
+.log-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.log-table tr:hover td { background: var(--bg3); }
+.log-table .undo-btn {
+  background: none;
+  border: none;
+  color: var(--red);
+  cursor: pointer;
+  font-size: .76rem;
+  font-family: var(--font);
+  font-weight: 500;
+  opacity: .7;
+  transition: opacity .15s;
+}
+.log-table .undo-btn:hover { opacity:1; }
 
 .tier-columns { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
 @media(max-width:900px){ .tier-columns{grid-template-columns:1fr 1fr;} }
-.tier-col h3 { text-align:center; padding:8px; border-radius:var(--radius) var(--radius) 0 0; font-size:.9rem; }
-.tier-col.t1 h3 { background:var(--green); color:#000; }
-.tier-col.t2 h3 { background:var(--accent2); color:#000; }
-.tier-col.t3 h3 { background:var(--yellow); color:#000; }
-.tier-col.t4 h3 { background:var(--text2); color:#000; }
-.tier-player { padding:6px 10px; font-size:.8rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; background:var(--bg2); cursor:pointer; }
-.tier-player:hover { background:var(--bg3); }
-.tier-player.sold { opacity:.35; text-decoration:line-through; }
-.tier-player .fma { color:var(--accent2); font-weight:600; }
+.tier-col h3 {
+  text-align: center;
+  padding: 10px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.tier-col.t1 h3 { background: var(--green); color:#000; }
+.tier-col.t2 h3 { background: #26c6da; color:#000; }
+.tier-col.t3 h3 { background: var(--yellow); color:#000; }
+.tier-col.t4 h3 { background: #666; color:#fff; }
+.tier-col { border: 1px solid var(--border); border-radius: var(--radius); overflow:hidden; }
+.tier-player {
+  padding: 8px 12px;
+  font-size: .8rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  background: var(--bg2);
+  cursor: pointer;
+  transition: background .1s;
+}
+.tier-player:last-child { border-bottom:none; }
+.tier-player:hover { background: var(--bg3); }
+.tier-player.sold { opacity:.25; text-decoration:line-through; }
+.tier-player .fma { color: var(--accent); font-weight: 700; font-variant-numeric:tabular-nums; }
 
-.upload-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:30px 20px; text-align:center; cursor:pointer; transition:.2s; color:var(--text2); }
-.upload-zone:hover, .upload-zone.dragover { border-color:var(--accent); background:rgba(108,92,231,0.08); color:var(--text); }
+.upload-zone {
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 36px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  color: var(--text2);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+}
 .upload-zone.uploading { opacity:.5; pointer-events:none; }
-.data-stat { display:inline-block; background:var(--bg3); padding:6px 14px; border-radius:var(--radius); margin:4px; }
-.data-stat strong { color:var(--accent2); }
-.toast { position:fixed; bottom:20px; right:20px; background:var(--green); color:#000; padding:12px 20px; border-radius:var(--radius); font-weight:600; z-index:300; display:none; }
-.toast.show { display:block; animation: fadeout 2s forwards; }
-@keyframes fadeout { 0%{opacity:1} 70%{opacity:1} 100%{opacity:0} }
+.data-stat {
+  display: inline-block;
+  background: var(--bg3);
+  padding: 7px 16px;
+  border-radius: 20px;
+  margin: 4px;
+  font-size: .82rem;
+  border: 1px solid var(--border);
+}
+.data-stat strong { color: var(--accent); font-weight: 700; }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--accent);
+  color: #000;
+  padding: 14px 24px;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: .88rem;
+  z-index: 300;
+  display: none;
+  box-shadow: var(--shadow-lg);
+}
+.toast.show { display:block; animation: toastIn 2.5s forwards; }
+@keyframes toastIn { 0%{opacity:0;transform:translateY(10px)} 10%{opacity:1;transform:translateY(0)} 75%{opacity:1} 100%{opacity:0} }
+
+.tier-filter-bar { display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap; }
+.tier-filter-bar button {
+  background: var(--bg3);
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  padding: 8px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 600;
+  font-family: var(--font);
+  transition: all .15s;
+}
+.tier-filter-bar button:hover { background: var(--bg4); color: var(--text); }
+.tier-filter-bar button.active-filter { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -128,16 +464,16 @@ header nav button:hover, header nav button.active { background:var(--accent); co
   <div class="container">
     <h1>FantaWizard</h1>
     <nav id="nav">
-      <button data-view="setup" class="active">Setup</button>
+      <button data-view="setup">Setup</button>
       <button data-view="data">Dati</button>
-      <button data-view="dashboard">Asta Live</button>
+      <button data-view="dashboard" class="active">Asta Live</button>
       <button data-view="tiers">Tier List</button>
       <button data-view="teams">Rose</button>
     </nav>
   </div>
 </header>
 
-<div id="view-setup" class="view active">
+<div id="view-setup" class="view">
 <div class="container">
   <div class="setup-grid">
     <div class="card">
@@ -154,7 +490,7 @@ header nav button:hover, header nav button.active { background:var(--accent); co
         <div class="field"><label>Crediti iniziali</label><input id="s-credits" type="number" value="500" step="50"></div>
         <div class="field"><label>Giornate</label><input id="s-matchdays" type="number" value="38"></div>
       </div>
-      <h2 style="margin-top:18px;">Rosa per ruolo</h2>
+      <h2 style="margin-top:20px;">Rosa per ruolo</h2>
       <div id="roster-slots" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
       <h2 style="margin-top:18px;">Budget % per reparto</h2>
       <div id="budget-splits" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
@@ -185,23 +521,23 @@ header nav button:hover, header nav button.active { background:var(--accent); co
   <div class="setup-grid">
     <div class="card">
       <h2>Quotazioni (Listone)</h2>
-      <p style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">
+      <p style="font-size:.78rem;color:var(--text3);margin-bottom:14px;line-height:1.5;">
         Carica il file Excel o CSV delle quotazioni da Fantacalcio.it / Fantagazzetta.<br>
-        Colonne riconosciute: <strong>Nome, R (ruolo), RM (ruolo mantra), Squadra, Qt.A, Qt.I</strong>
+        Colonne: <span style="color:var(--text2);">Nome, R, RM, Squadra, Qt.A, Qt.I</span>
       </p>
       <div class="upload-zone" id="drop-quotazioni" onclick="document.getElementById('file-quotazioni').click()">
-        <div style="font-size:2rem;">&#128196;</div>
-        <div>Trascina qui o clicca per scegliere il file</div>
-        <div style="font-size:.75rem;color:var(--text2);">.xlsx, .xls, .csv</div>
+        <div style="font-size:1.5rem;margin-bottom:6px;">&#8593;</div>
+        <div style="font-weight:600;font-size:.88rem;">Trascina qui o clicca</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">.xlsx .xls .csv</div>
       </div>
       <input type="file" id="file-quotazioni" accept=".xlsx,.xls,.csv" style="display:none">
       <div id="quotazioni-status" style="margin-top:10px;font-size:.85rem;"></div>
     </div>
     <div class="card">
       <h2>Statistiche Stagionali</h2>
-      <p style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">
+      <p style="font-size:.78rem;color:var(--text3);margin-bottom:14px;line-height:1.5;">
         Carica le statistiche reali dei giocatori (presenze, media voto, gol, assist...).<br>
-        Colonne riconosciute: <strong>Nome, Pg, Mv, Mf/Fm, Gol, Assist, Amm, Esp, Rig, Au</strong>
+        Colonne: <span style="color:var(--text2);">Nome, Pg, Mv, Mf/Fm, Gol, Assist, Amm, Esp, Rig, Au</span>
       </p>
       <div class="field"><label>Stagione</label>
         <select id="stats-season">
@@ -212,9 +548,9 @@ header nav button:hover, header nav button.active { background:var(--accent); co
         </select>
       </div>
       <div class="upload-zone" id="drop-stats" onclick="document.getElementById('file-stats').click()">
-        <div style="font-size:2rem;">&#128202;</div>
-        <div>Trascina qui o clicca per scegliere il file</div>
-        <div style="font-size:.75rem;color:var(--text2);">.xlsx, .xls, .csv</div>
+        <div style="font-size:1.5rem;margin-bottom:6px;">&#8593;</div>
+        <div style="font-weight:600;font-size:.88rem;">Trascina qui o clicca</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">.xlsx .xls .csv</div>
       </div>
       <input type="file" id="file-stats" accept=".xlsx,.xls,.csv" style="display:none">
       <div id="stats-status" style="margin-top:10px;font-size:.85rem;"></div>
@@ -227,16 +563,16 @@ header nav button:hover, header nav button.active { background:var(--accent); co
 </div>
 </div>
 
-<div id="view-dashboard" class="view">
+<div id="view-dashboard" class="view active">
 <div class="container">
+  <div class="search-box" style="margin-bottom:24px;">
+    <input id="player-search" placeholder="Cerca giocatore..." autocomplete="off">
+    <div class="search-results" id="search-results"></div>
+  </div>
   <div class="dash-top">
     <div>
-      <div class="search-box">
-        <input id="player-search" placeholder="Cerca giocatore (min 2 lettere)..." autocomplete="off">
-        <div class="search-results" id="search-results"></div>
-      </div>
-      <div style="margin-top:20px;">
-        <h2 style="font-size:1rem;margin-bottom:10px;">Ultimi acquisti</h2>
+      <div class="card">
+        <h2>Ultimi acquisti</h2>
         <table class="log-table">
           <thead><tr><th>Giocatore</th><th>Ruolo</th><th>Squadra</th><th>Prezzo</th><th>Acquirente</th><th></th></tr></thead>
           <tbody id="purchases-log"></tbody>
@@ -259,11 +595,11 @@ header nav button:hover, header nav button.active { background:var(--accent); co
 
 <div id="view-tiers" class="view">
 <div class="container">
-  <div style="display:flex;gap:10px;margin-bottom:16px;">
-    <button class="btn btn-sm" onclick="showTierRole('P')">Portieri</button>
-    <button class="btn btn-sm" onclick="showTierRole('D')">Difensori</button>
-    <button class="btn btn-sm" onclick="showTierRole('C')">Centrocampisti</button>
-    <button class="btn btn-sm" onclick="showTierRole('A')">Attaccanti</button>
+  <div class="tier-filter-bar" id="tier-filter-bar">
+    <button onclick="showTierRole('P')" data-role="P">Portieri</button>
+    <button onclick="showTierRole('D')" data-role="D">Difensori</button>
+    <button onclick="showTierRole('C')" data-role="C">Centrocampisti</button>
+    <button onclick="showTierRole('A')" data-role="A" class="active-filter">Attaccanti</button>
   </div>
   <div class="tier-columns" id="tier-display"></div>
 </div>
@@ -543,13 +879,13 @@ function renderSetup() {
 
   document.querySelector('#bonus-table tbody').innerHTML = BONUS_DEFAULTS.map(b => {
     const checked = b.value !== 0 ? 'checked' : '';
-    const cls = b.adv ? 'style="color:var(--text2)"' : '';
+    const cls = b.adv ? 'style="color:var(--text3)"' : '';
     return `<tr ${cls}><td>${b.label}</td><td><input type="number" step="0.5" value="${b.value}" data-bonus="${b.code}" class="bonus-val"></td><td><input type="checkbox" ${checked} data-bonus-chk="${b.code}" class="bonus-chk"></td></tr>`;
   }).join('');
 
   document.getElementById('modifiers-list').innerHTML = MODIFIER_DEFAULTS.map(m =>
-    `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.9rem;cursor:pointer;">
-      <input type="checkbox" data-mod="${m.code}" class="mod-chk" style="accent-color:var(--accent);"> ${m.label}
+    `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:.85rem;cursor:pointer;color:var(--text2);transition:color .15s;" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text2)'">
+      <input type="checkbox" data-mod="${m.code}" class="mod-chk" style="accent-color:var(--accent);width:16px;height:16px;"> ${m.label}
     </label>`
   ).join('');
 
@@ -567,8 +903,8 @@ function renderTeamNames() {
     const val = existing[i] || (i === 0 ? 'La mia squadra' : `Squadra ${i + 1}`);
     const isUser = i === 0;
     html += `<div style="display:flex;align-items:center;gap:8px;">
-      <input type="text" class="team-name-input" data-idx="${i}" value="${val}" style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:var(--radius);font-size:.85rem;">
-      ${isUser ? '<span style="font-size:.7rem;color:var(--accent2);white-space:nowrap;">★ Tu</span>' : ''}
+      <input type="text" class="team-name-input" data-idx="${i}" value="${val}" style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border2);padding:8px 12px;border-radius:var(--radius-sm);font-size:.85rem;font-family:var(--font);">
+      ${isUser ? '<span style="font-size:.68rem;color:var(--accent);white-space:nowrap;font-weight:600;">TU</span>' : ''}
     </div>`;
   }
   container.innerHTML = html;
@@ -578,10 +914,10 @@ async function loadExistingAuctions() {
   const {data} = await sb.from('auctions').select('*').order('created_at', {ascending: false});
   const el = document.getElementById('existing-auctions');
   if (!data || !data.length) { el.innerHTML = ''; return; }
-  el.innerHTML = '<h2 style="margin-bottom:10px;">Aste esistenti</h2>' +
-    data.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px;">
-      <span><strong>${a.name}</strong> — ${a.num_teams} squadre, ${a.initial_credits} crediti</span>
-      <div style="display:flex;gap:6px;">
+  el.innerHTML = '<h2 style="margin-bottom:12px;">Aste esistenti</h2>' +
+    data.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;">
+      <div><strong>${a.name}</strong><span style="color:var(--text2);font-size:.82rem;margin-left:10px;">${a.num_teams} squadre · ${a.initial_credits} crediti</span></div>
+      <div style="display:flex;gap:8px;">
         <button class="btn btn-sm" onclick="loadAuction(${a.id})">Apri</button>
         <button class="btn btn-sm btn-danger" onclick="deleteAuction(${a.id}, '${a.name.replace(/'/g,"\\'")}')">Elimina</button>
       </div>
@@ -727,9 +1063,9 @@ function searchPlayers(q) {
           <span class="name">${p.name}</span>
           <span class="meta">${p.role_classic} · ${p.team} ${p.is_penalty_taker?'⚽':''}${p.sold?' · VENDUTO':''}</span>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:10px;align-items:center;">
           <span class="price-tag t${p.tier}">F${p.tier}</span>
-          <span style="font-weight:700;color:var(--green);">${p.rec}</span>
+          <span class="rec-price">${p.rec}</span>
         </div>
       </div>
     `).join('');
@@ -763,16 +1099,16 @@ async function openPlayer(id) {
   document.getElementById('modal-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:start;">
       <div>
-        <h2>${pl.name} <span class="price-tag t${tier}" style="font-size:.8rem;">Fascia ${tier}</span></h2>
+        <h2>${pl.name} <span class="price-tag t${tier}" style="font-size:.75rem;vertical-align:middle;margin-left:8px;">F${tier}</span></h2>
         <div class="subtitle">${pl.role_classic}${pl.role_mantra?' · '+pl.role_mantra:''} · ${pl.team} ${pl.is_penalty_taker?'· Rigorista':''}</div>
       </div>
-      <button onclick="document.getElementById('player-modal').classList.remove('open')" style="background:none;border:none;color:var(--text2);font-size:1.5rem;cursor:pointer;">✕</button>
+      <button onclick="document.getElementById('player-modal').classList.remove('open')" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;font-family:var(--font);">&#x2715;</button>
     </div>
     <div class="stats-grid">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
-      <div class="stat-box"><div class="val" style="color:var(--green);">${rec}</div><div class="lbl">Prezzo consigliato</div></div>
-      <div class="stat-box"><div class="val">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
-      <div class="stat-box"><div class="val">${mb}</div><div class="lbl">Max bid</div></div>
+      <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
     </div>
     <h3 style="font-size:.9rem;margin:12px 0 8px;">Ultime stagioni</h3>
     <table class="log-table">
@@ -849,8 +1185,8 @@ async function refreshBudget() {
     byRole[role].push(p.price);
   }
 
-  let html = `<div style="font-size:1.8rem;font-weight:700;color:var(--green);">${remaining}</div>
-    <div style="font-size:.8rem;color:var(--text2);margin-bottom:12px;">crediti rimasti su ${auctionData.initial_credits} — ${(purchases||[]).length}/${totalSlots} slot</div>
+  let html = `<div style="font-size:2.2rem;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;letter-spacing:-.02em;">${remaining}</div>
+    <div style="font-size:.78rem;color:var(--text2);margin-bottom:14px;">crediti rimasti su ${auctionData.initial_credits} — ${(purchases||[]).length}/${totalSlots} slot</div>
     <div class="budget-bars">`;
 
   for (const [role, count] of Object.entries(rosterSlots)) {
@@ -873,6 +1209,9 @@ async function refreshBudget() {
 // ── Tiers ──
 function showTierRole(role) {
   if (!currentAuction) return;
+  document.querySelectorAll('#tier-filter-bar button').forEach(b => {
+    b.classList.toggle('active-filter', b.dataset.role === role);
+  });
   const seasonMap = buildSeasonMap();
   const tierData = computeTiers(allPlayers, seasonMap);
   const roleTiers = tierData[role] || {};
@@ -907,13 +1246,15 @@ async function refreshTeams() {
 
   document.getElementById('teams-display').innerHTML = Object.values(teamData).map(({team, purchases: tp, spent}) => `
     <div class="card" style="margin-bottom:16px;">
-      <h2>${team.name} ${team.is_user?'(Tu)':''}</h2>
-      <div style="font-size:.85rem;color:var(--text2);margin-bottom:8px;">
-        Spesi: ${spent}/${auctionData.initial_credits} · Rimasti: ${auctionData.initial_credits - spent} · Slot: ${tp.length}/${totalSlots}
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;">
+        <h2 style="margin-bottom:0;">${team.name} ${team.is_user?'<span style="color:var(--accent);font-size:.72rem;font-weight:700;margin-left:6px;">TU</span>':''}</h2>
+        <div style="font-size:.78rem;color:var(--text2);font-variant-numeric:tabular-nums;">
+          <span style="color:var(--accent);font-weight:700;">${auctionData.initial_credits - spent}</span> rimasti · ${tp.length}/${totalSlots} slot
+        </div>
       </div>
       ${tp.length ? `<table class="log-table"><thead><tr><th>Giocatore</th><th>Ruolo</th><th>Prezzo</th></tr></thead><tbody>
-        ${tp.map(p => `<tr><td>${p.players?.name||'?'}</td><td>${p.players?.role_classic||''}</td><td>${p.price}</td></tr>`).join('')}
-      </tbody></table>` : '<div style="color:var(--text2);font-size:.85rem;">Nessun acquisto</div>'}
+        ${tp.map(p => `<tr><td><strong>${p.players?.name||'?'}</strong></td><td>${p.players?.role_classic||''}</td><td style="font-weight:700;font-variant-numeric:tabular-nums;">${p.price}</td></tr>`).join('')}
+      </tbody></table>` : '<div style="color:var(--text3);font-size:.82rem;">Nessun acquisto</div>'}
     </div>
   `).join('');
 }
@@ -1180,6 +1521,7 @@ document.addEventListener('keydown', (e) => {
 // ── Init ──
 renderSetup();
 loadExistingAuctions();
+loadAllData();
 </script>
 </body>
 </html>
