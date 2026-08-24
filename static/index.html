@@ -649,7 +649,7 @@ document.querySelectorAll('#nav button').forEach(btn => {
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if (btn.dataset.view === 'data') refreshDataSummary();
     if (btn.dataset.view === 'dashboard' && currentAuction) refreshDashboard();
-    if (btn.dataset.view === 'tiers' && currentAuction) showTierRole('A');
+    if (btn.dataset.view === 'tiers') showTierRole('A');
     if (btn.dataset.view === 'teams' && currentAuction) refreshTeams();
   });
 });
@@ -1208,10 +1208,16 @@ async function refreshBudget() {
 
 // ── Tiers ──
 function showTierRole(role) {
-  if (!currentAuction) return;
   document.querySelectorAll('#tier-filter-bar button').forEach(b => {
     b.classList.toggle('active-filter', b.dataset.role === role);
   });
+  if (!allPlayers.length) {
+    document.getElementById('tier-display').innerHTML = '<div style="color:var(--text2);text-align:center;padding:40px;">Carica prima i dati nella sezione Dati</div>';
+    return;
+  }
+  if (!currentAuction && !Object.keys(bonusMap).length) {
+    for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
+  }
   const seasonMap = buildSeasonMap();
   const tierData = computeTiers(allPlayers, seasonMap);
   const roleTiers = tierData[role] || {};
