@@ -775,6 +775,10 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .plan-empty-slot:hover { background:var(--bg3); color:var(--text2); }
 .plan-empty-slot:last-child { border-bottom:none; }
+.plan-search-budget {
+  font-size:.75rem; color:var(--text2); padding:6px 0 8px;
+  border-bottom:1px solid var(--border); margin-bottom:8px;
+}
 .plan-search-inline {
   width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2);
   padding:8px 12px; border-radius:var(--radius-sm); font-family:var(--font); font-size:.84rem;
@@ -2294,6 +2298,10 @@ function autoFillPlan() {
     const roleBudget = Math.round(credits * budgetPct);
     const nStarters = Math.min(starters[role] || 0, count);
     const nBench = count - nStarters;
+
+    const starterBudget = nBench > 0 ? Math.round(roleBudget * 0.75) : roleBudget;
+    const benchBudget = roleBudget - starterBudget;
+
     const rolePlayers = allPlayers.filter(p => p.role_classic === role && !soldIds.has(p.id));
     const scored = rolePlayers.map(pl => {
       const ss = seasonMap[pl.id] || [];
@@ -2310,39 +2318,40 @@ function autoFillPlan() {
       return {playerId: pl.id, adjFma, rec: Math.max(rec, 1), value};
     });
 
-    let spent = 0;
+    let starterSpent = 0;
     targetList[role] = [];
     const pickedIds = new Set();
 
     const byFma = [...scored].sort((a,b) => b.adjFma - a.adjFma);
     for (const s of byFma) {
       if (targetList[role].length >= nStarters) break;
-      const remaining = roleBudget - spent;
-      const slotsLeft = count - targetList[role].length;
-      const budgetForRest = slotsLeft - 1;
-      if (s.rec > remaining - budgetForRest) continue;
-      const maxPrice = Math.max(s.rec, Math.min(Math.round(s.rec * 1.15), remaining - budgetForRest));
+      const remaining = starterBudget - starterSpent;
+      const slotsLeft = nStarters - targetList[role].length;
+      const avgPerSlot = Math.round(remaining / slotsLeft);
+      if (s.rec > remaining - (slotsLeft - 1)) continue;
+      const maxPrice = Math.max(s.rec, Math.min(avgPerSlot, remaining - (slotsLeft - 1)));
       targetList[role].push({playerId: s.playerId, maxPrice, starter: true});
       pickedIds.add(s.playerId);
-      spent += maxPrice;
+      starterSpent += maxPrice;
     }
 
+    let benchSpent = 0;
     const byValue = [...scored].filter(s => !pickedIds.has(s.playerId)).sort((a,b) => b.value - a.value);
     for (const s of byValue) {
       if (targetList[role].length >= count) break;
-      const remaining = roleBudget - spent;
+      const remaining = benchBudget - benchSpent;
       const slotsLeft = count - targetList[role].length;
-      const budgetForRest = slotsLeft - 1;
-      if (s.rec > remaining - budgetForRest) continue;
-      const maxPrice = Math.max(s.rec, Math.min(Math.round(s.rec * 1.15), remaining - budgetForRest));
+      const avgPerSlot = Math.round(remaining / slotsLeft);
+      if (s.rec > remaining - (slotsLeft - 1)) continue;
+      const maxPrice = Math.max(1, Math.min(avgPerSlot, remaining - (slotsLeft - 1)));
       targetList[role].push({playerId: s.playerId, maxPrice, starter: false});
       pickedIds.add(s.playerId);
-      spent += maxPrice;
+      benchSpent += maxPrice;
     }
   }
   savePlan();
   renderPlan();
-  toast('Piano auto-generato!');
+  toast('Piano generato in base al budget per ruolo!', 'success');
 }
 
 function clearPlan() {
@@ -2474,14 +2483,22 @@ function renderPlanBody() {
           </div>
         </div>${altsHtml}`;
       } else if (i < count) {
+        const budgetPctE = (splits[role] || 25) / 100;
+        const allocatedE = Math.round(credits * budgetPctE);
+        const spentE = tgts.reduce((a,t) => a + (t.maxPrice || 0), 0);
+        const remainE = allocatedE - spentE;
+        const slotsLeftE = count - tgts.length;
+        const avgTargetE = slotsLeftE > 0 ? Math.round(remainE / slotsLeftE) : 0;
         rolesHtml += `<div class="plan-empty-slot" onclick="openSlotSearch('${role}',${i})">
           <div class="plan-slot-num" style="background:var(--accent-dim);color:var(--accent);">+</div>
           <span>Aggiungi obiettivo ${role} #${i+1}</span>
+          <span style="margin-left:auto;font-size:.72rem;color:var(--text3);font-variant-numeric:tabular-nums;">~${avgTargetE}cr target</span>
         </div>`;
       }
     }
 
     rolesHtml += `<div id="plan-search-${role}" style="display:none;padding:8px 16px;">
+      <div class="plan-search-budget" id="plan-sb-${role}"></div>
       <input class="plan-search-inline" placeholder="Cerca ${role}..." oninput="planSearch('${role}',this.value)">
       <div class="plan-search-results" id="plan-sr-${role}"></div>
     </div>`;
@@ -2511,24 +2528,54 @@ function openSlotSearch(role, idx) {
   document.querySelectorAll('[id^="plan-search-"]').forEach(e => e.style.display = 'none');
   if (!wasOpen) {
     el.style.display = '';
-    el.querySelector('input').focus();
+    const credits = getActiveCredits();
+    const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
+    const rolesConf = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
+    const roleBudget = Math.round(credits * (splits[role] || 0) / 100);
+    const tgts = targetList[role] || [];
+    const spent = tgts.reduce((a,t) => a + (t.maxPrice || 0), 0);
+    const remaining = roleBudget - spent;
+    const slotsLeft = (rolesConf[role] || 0) - tgts.length;
+    const avgTarget = slotsLeft > 0 ? Math.round(remaining / slotsLeft) : 0;
+
+    const budgetEl = document.getElementById(`plan-sb-${role}`);
+    if (budgetEl) {
+      const remClr = remaining > 0 ? 'var(--accent)' : 'var(--red)';
+      budgetEl.innerHTML = `<span style="color:${ROLE_COLORS[role]};font-weight:700;">${role}</span> Budget: <strong style="color:${remClr};">${remaining}</strong>/${roleBudget}cr rimanenti &middot; Target ~<strong>${avgTarget}</strong>cr/slot (${slotsLeft} rimasti)`;
+    }
+    const inp = el.querySelector('input');
+    inp.value = '';
+    inp.focus();
+    planSearch(role, '');
   }
 }
 
 function planSearch(role, q) {
   const el = document.getElementById(`plan-sr-${role}`);
-  if (q.length < 2) { el.innerHTML = ''; return; }
-  q = q.toLowerCase();
   const existing = new Set((targetList[role]||[]).map(t => t.playerId));
-  const results = allPlayers.filter(p => p.role_classic === role && p.name.toLowerCase().includes(q) && !existing.has(p.id) && !soldIds.has(p.id)).slice(0, 8);
   const seasonMap = buildSeasonMap();
   const tierData = computeTiers(allPlayers, seasonMap);
   const credits = getActiveCredits();
   const numTeams = auctionData?.num_teams || 10;
-  const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
-  const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
+  const rolesConf = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
+  const totalSlots = Object.values(rolesConf).reduce((a,b)=>a+b,0) || 25;
+  const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
 
-  el.innerHTML = results.map(pl => {
+  const roleBudget = Math.round(credits * (splits[role] || 0) / 100);
+  const tgts = targetList[role] || [];
+  const spent = tgts.reduce((a,t) => a + (t.maxPrice || 0), 0);
+  const remaining = roleBudget - spent;
+  const slotsLeft = (rolesConf[role] || 0) - tgts.length;
+  const avgTarget = slotsLeft > 0 ? Math.round(remaining / slotsLeft) : 0;
+
+  const isSearch = q && q.length >= 2;
+  const ql = isSearch ? q.toLowerCase() : '';
+
+  let candidates = allPlayers
+    .filter(p => p.role_classic === role && !existing.has(p.id) && !soldIds.has(p.id))
+    .filter(p => !isSearch || p.name.toLowerCase().includes(ql));
+
+  const scored = candidates.map(pl => {
     const ss = seasonMap[pl.id] || [];
     const fma = projectFMA(pl, ss);
     const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
@@ -2539,9 +2586,33 @@ function planSearch(role, q) {
     const sc = computeScarcity(tier, rt);
     const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
     const rec = recommendedPrice(bp, role, tier, {}, sc, 999, mkt);
-    return `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${Math.round(rec*1.2)});renderPlan();">
-      <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} · F${tier}</span></span>
-      <span style="color:var(--accent);font-weight:700;">FMA ${adjFma} · ~${rec}cr</span>
+    const budgetFit = avgTarget > 0 ? Math.max(0, 1 - Math.abs(rec - avgTarget * 0.8) / (avgTarget || 1)) : 0;
+    return {pl, adjFma, tier, rec, budgetFit};
+  });
+
+  let items; let headerHtml = '';
+  if (isSearch) {
+    items = scored.slice(0, 8);
+  } else {
+    if (!scored.length) { el.innerHTML = ''; return; }
+    headerHtml = `<div style="font-size:.72rem;color:var(--text3);padding:6px 12px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;">Consigliati per ~${avgTarget}cr</div>`;
+    items = scored
+      .filter(s => avgTarget === 0 || s.rec <= avgTarget * 1.5)
+      .sort((a,b) => (b.adjFma * 0.5 + b.budgetFit * 50) - (a.adjFma * 0.5 + a.budgetFit * 50))
+      .slice(0, 6);
+  }
+
+  el.innerHTML = headerHtml + items.map(({pl, adjFma, tier, rec}) => {
+    const fits = rec <= avgTarget;
+    const fitClr = fits ? 'var(--green)' : rec <= avgTarget * 1.3 ? 'var(--yellow)' : 'var(--red)';
+    const fitIcon = fits ? '&#10003;' : rec <= avgTarget * 1.3 ? '&#9888;' : '&#10007;';
+    const maxBid = Math.min(Math.max(rec, Math.min(avgTarget, Math.round(rec * 1.5))), remaining > 0 ? remaining : rec);
+    return `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${maxBid});renderPlan();">
+      <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} &middot; F${tier}</span></span>
+      <span style="display:flex;align-items:center;gap:6px;">
+        <span style="color:var(--accent);font-weight:700;">FMA ${adjFma} &middot; ~${rec}cr</span>
+        <span style="font-size:.68rem;color:${fitClr};font-weight:600;" title="${fits?'Rientra nel budget target':'Sopra il target'}">${fitIcon}</span>
+      </span>
     </div>`;
   }).join('');
 }
