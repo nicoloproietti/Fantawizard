@@ -316,7 +316,8 @@ a { color: var(--accent2); text-decoration: none; }
   transition: background .1s;
 }
 .sr-item:last-child { border-bottom:none; }
-.sr-item:hover { background: var(--bg3); }
+.sr-item:hover, .sr-item.kb-active { background: var(--bg3); }
+.sr-item.kb-active { outline:2px solid var(--accent); outline-offset:-2px; }
 .sr-item .name { font-weight: 600; font-size:.9rem; }
 .sr-item .meta { font-size: .78rem; color: var(--text2); margin-left:8px; }
 .sr-item .price-tag {
@@ -393,11 +394,12 @@ a { color: var(--accent2); text-decoration: none; }
 .modal .subtitle { color:var(--text2); font-size:.85rem; margin-bottom:16px; }
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
   margin: 18px 0;
 }
-@media(max-width:500px){ .stats-grid{grid-template-columns:repeat(2,1fr);} }
+@media(max-width:700px){ .stats-grid{grid-template-columns:repeat(3,1fr);} }
+@media(max-width:420px){ .stats-grid{grid-template-columns:repeat(2,1fr);} }
 .stat-box {
   background: var(--bg3);
   padding: 14px 10px;
@@ -718,6 +720,26 @@ a { color: var(--accent2); text-decoration: none; }
 .aw-team-detail td { padding:3px 6px; font-size:.78rem; border-bottom:1px solid var(--border); }
 .aw-team-detail td:first-child { font-weight:600; }
 .aw-heatmap-cell { display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:700; border-radius:3px; min-height:32px; }
+
+/* ── Responsive: sidebar persistent on desktop ── */
+@media(min-width:901px) {
+  .sidebar { transform:translateX(0); }
+  .sidebar-overlay { display:none !important; }
+  .hamburger { display:none; }
+  .topbar { margin-left:230px; }
+  .view { margin-left:230px; }
+}
+/* ── Responsive: DB table column priority ── */
+.db-table .col-p3 { } /* always visible */
+.db-table .col-p2 { } /* hide below 900px */
+.db-table .col-p1 { } /* hide below 700px */
+@media(max-width:900px) { .db-table .col-p2 { display:none; } }
+@media(max-width:700px) { .db-table .col-p1 { display:none; } }
+@media(max-width:600px) {
+  .db-toolbar { gap:6px; }
+  .db-filter { width:100%; }
+  .db-filter-select { width:100%; }
+}
 
 /* ── Plan View ── */
 .plan-role-section { margin-bottom:24px; }
@@ -2794,14 +2816,29 @@ function subscribePurchases() {
 
 // ── Dashboard ──
 let searchTimeout = null;
+let kbIdx = -1;
 document.getElementById('player-search').addEventListener('input', (e) => {
   clearTimeout(searchTimeout);
+  kbIdx = -1;
   const q = e.target.value.trim().toLowerCase();
   if (q.length < 2) { document.getElementById('search-results').classList.remove('open'); return; }
   searchTimeout = setTimeout(() => searchPlayers(q), 150);
 });
+document.getElementById('player-search').addEventListener('keydown', (e) => {
+  const el = document.getElementById('search-results');
+  if (!el.classList.contains('open')) return;
+  const items = el.querySelectorAll('.sr-item');
+  if (!items.length) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); kbIdx = Math.min(kbIdx + 1, items.length - 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); kbIdx = Math.max(kbIdx - 1, 0); }
+  else if (e.key === 'Enter' && kbIdx >= 0) { e.preventDefault(); items[kbIdx].click(); return; }
+  else if (e.key === 'Escape') { el.classList.remove('open'); kbIdx = -1; return; }
+  else return;
+  items.forEach((it, i) => it.classList.toggle('kb-active', i === kbIdx));
+  if (kbIdx >= 0) items[kbIdx].scrollIntoView({block:'nearest'});
+});
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.search-box')) document.getElementById('search-results').classList.remove('open');
+  if (!e.target.closest('.search-box')) { document.getElementById('search-results').classList.remove('open'); kbIdx = -1; }
 });
 document.getElementById('credit-ref').addEventListener('change', () => {
   if (document.getElementById('view-players').classList.contains('active')) renderPlayersDB();
@@ -3043,7 +3080,7 @@ async function openPlayer(id) {
   const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
   const relLabel = isProjected ? 'Affid. stimata' : 'Affidabilità';
   const statsGridHtml = currentAuction ? `
-    <div class="stats-grid" style="grid-template-columns:repeat(6,1fr);">
+    <div class="stats-grid">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA grezza</div></div>
       <div class="stat-box"><div class="val" style="color:${relClr};">${relPct}%</div><div class="lbl">${relLabel}</div></div>
       <div class="stat-box"><div class="val">${adjFma}</div><div class="lbl">FMA adj</div></div>
@@ -3051,7 +3088,7 @@ async function openPlayer(id) {
       <div class="stat-box"><div class="val" style="color:#2fc5ee;">${mktValHtml}</div><div class="lbl">${mktLabel}</div></div>
       <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
     </div>` : `
-    <div class="stats-grid" style="grid-template-columns:repeat(6,1fr);">
+    <div class="stats-grid">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA grezza</div></div>
       <div class="stat-box"><div class="val" style="color:${relClr};">${relPct}%</div><div class="lbl">${relLabel}</div></div>
       <div class="stat-box"><div class="val">${adjFma}</div><div class="lbl">FMA adj</div></div>
@@ -3403,21 +3440,21 @@ let dbSearch = '';
 let dbTeam = '';
 
 const DB_COLS = [
-  {key:'name', label:'Giocatore', cls:'player-name'},
-  {key:'team', label:'Squadra', cls:'team-col'},
-  {key:'role_classic', label:'R', cls:''},
-  {key:'fma', label:'FMA', cls:'num-col', num:true},
-  {key:'reliability', label:'Affid.', cls:'num-col', num:true},
-  {key:'statusLabel', label:'Status', cls:''},
-  {key:'adjFma', label:'FMA adj', cls:'num-col', num:true},
-  {key:'rec', label:'Consigliato', cls:'num-col', num:true},
-  {key:'mkt', label:'Media aste', cls:'num-col', num:true},
-  {key:'initial_price', label:'Quot.', cls:'num-col', num:true},
-  {key:'avg_rating', label:'MV', cls:'num-col', num:true},
-  {key:'fanta_avg', label:'FM', cls:'num-col', num:true},
-  {key:'appearances', label:'Pres', cls:'num-col', num:true},
-  {key:'goals', label:'Gol', cls:'num-col', num:true},
-  {key:'assists', label:'Ass', cls:'num-col', num:true},
+  {key:'name', label:'Giocatore', cls:'player-name', pri:3},
+  {key:'team', label:'Squadra', cls:'team-col', pri:2},
+  {key:'role_classic', label:'R', cls:'', pri:3},
+  {key:'fma', label:'FMA', cls:'num-col', num:true, pri:2},
+  {key:'reliability', label:'Affid.', cls:'num-col', num:true, pri:1},
+  {key:'statusLabel', label:'Status', cls:'', pri:1},
+  {key:'adjFma', label:'FMA adj', cls:'num-col', num:true, pri:3},
+  {key:'rec', label:'Consigliato', cls:'num-col', num:true, pri:3},
+  {key:'mkt', label:'Media aste', cls:'num-col', num:true, pri:2},
+  {key:'initial_price', label:'Quot.', cls:'num-col', num:true, pri:1},
+  {key:'avg_rating', label:'MV', cls:'num-col', num:true, pri:1},
+  {key:'fanta_avg', label:'FM', cls:'num-col', num:true, pri:1},
+  {key:'appearances', label:'Pres', cls:'num-col', num:true, pri:1},
+  {key:'goals', label:'Gol', cls:'num-col', num:true, pri:1},
+  {key:'assists', label:'Ass', cls:'num-col', num:true, pri:1},
 ];
 
 function renderPlayersDB() {
@@ -3479,28 +3516,30 @@ function renderPlayersDB() {
   document.getElementById('db-thead').innerHTML = DB_COLS.map(c => {
     const sorted = dbSort.col === c.key;
     const arrow = sorted ? (dbSort.dir === 'asc' ? '&#9650;' : '&#9660;') : '';
-    return `<th class="${c.num?'num-col':''} ${sorted?'sorted':''}" data-col="${c.key}">${c.label}<span class="sort-arrow">${arrow}</span></th>`;
+    const priCls = c.pri < 3 ? ` col-p${c.pri}` : '';
+    return `<th class="${c.num?'num-col':''} ${sorted?'sorted':''}${priCls}" data-col="${c.key}">${c.label}<span class="sort-arrow">${arrow}</span></th>`;
   }).join('');
 
   document.getElementById('db-tbody').innerHTML = filtered.map(r => {
     const tierCls = `t${r.tier}`;
     const relClr = r.reliability >= 90 ? 'var(--green)' : r.reliability >= 70 ? 'var(--yellow)' : 'var(--red)';
+    const p1 = ' col-p1', p2 = ' col-p2';
     return `<tr onclick="openPlayer(${r.id})" class="${r.sold?'sold':''}">
       <td class="player-name">${r.name} ${r.is_penalty_taker?'<span title="Rigorista" style="color:var(--yellow);">&#9917;</span>':''}</td>
-      <td class="team-col">${r.team}</td>
+      <td class="team-col${p2}">${r.team}</td>
       <td><span class="price-tag ${tierCls}" style="font-size:.7rem;padding:2px 8px;">${r.role_classic}</span></td>
-      <td class="num-col" style="font-weight:700;color:var(--accent);">${r.fma}</td>
-      <td class="num-col" style="font-weight:600;color:${relClr};" title="${r.projected?'Stimata da quotazione':'Basata su presenze'}">${r.reliability}%${r.projected?'*':''}</td>
-      <td><span class="status-badge ${r.statusCls}">${r.statusLabel}</span></td>
+      <td class="num-col${p2}" style="font-weight:700;color:var(--accent);">${r.fma}</td>
+      <td class="num-col${p1}" style="font-weight:600;color:${relClr};" title="${r.projected?'Stimata da quotazione':'Basata su presenze'}">${r.reliability}%${r.projected?'*':''}</td>
+      <td class="${p1}"><span class="status-badge ${r.statusCls}">${r.statusLabel}</span></td>
       <td class="num-col" style="font-weight:700;color:var(--accent);">${r.adjFma}</td>
       <td class="num-col" style="font-weight:700;color:var(--green);">${r.rec}</td>
-      <td class="num-col" style="color:#2fc5ee;">${r.mkt||'-'}</td>
-      <td class="num-col">${r.initial_price||'-'}</td>
-      <td class="num-col">${r.avg_rating||'-'}</td>
-      <td class="num-col">${r.fanta_avg||'-'}</td>
-      <td class="num-col">${r.appearances||'-'}</td>
-      <td class="num-col">${r.goals||'-'}</td>
-      <td class="num-col">${r.assists||'-'}</td>
+      <td class="num-col${p2}" style="color:#2fc5ee;">${r.mkt||'-'}</td>
+      <td class="num-col${p1}">${r.initial_price||'-'}</td>
+      <td class="num-col${p1}">${r.avg_rating||'-'}</td>
+      <td class="num-col${p1}">${r.fanta_avg||'-'}</td>
+      <td class="num-col${p1}">${r.appearances||'-'}</td>
+      <td class="num-col${p1}">${r.goals||'-'}</td>
+      <td class="num-col${p1}">${r.assists||'-'}</td>
     </tr>`;
   }).join('');
 
