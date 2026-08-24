@@ -806,9 +806,15 @@ function computeMaxBid(auction, userPurchases) {
   return Math.max(0, auction.initial_credits - spent - (remaining - 1));
 }
 
-function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid) {
+function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPrice) {
   const infl = inflation[role] || 1;
-  const raw = bp * infl * scarcity;
+  const analytical = bp * infl * scarcity;
+  let raw;
+  if (marketPrice && marketPrice > 0) {
+    raw = analytical * 0.55 + marketPrice * 0.45;
+  } else {
+    raw = analytical;
+  }
   return Math.max(1, Math.min(Math.round(raw), maxBid || 999));
 }
 
@@ -1074,7 +1080,7 @@ function searchPlayers(q) {
       const bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
       const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
       const scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
-      const rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb);
+      const rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, pl.avg_auction_price);
       return {...pl, fma, bp, rec, tier, mb, sold: soldIds.has(pl.id)};
     });
     results.sort((a,b) => b.fma - a.fma);
@@ -1087,6 +1093,7 @@ function searchPlayers(q) {
         </div>
         <div style="display:flex;gap:10px;align-items:center;">
           <span class="price-tag t${p.tier}">F${p.tier}</span>
+          ${p.avg_auction_price ? `<span style="font-size:.78rem;color:#26c6da;font-weight:600;font-variant-numeric:tabular-nums;">${p.avg_auction_price}</span>` : ''}
           <span class="rec-price">${p.rec}</span>
         </div>
       </div>
@@ -1225,7 +1232,7 @@ async function openPlayer(id) {
     bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
     tier = getPlayerTier(pl.id, pl.role_classic, tierData);
     scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
-    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb);
+    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, pl.avg_auction_price);
   } else {
     if (!Object.keys(bonusMap).length) {
       for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
@@ -1253,15 +1260,18 @@ async function openPlayer(id) {
       <button class="btn" onclick="buyPlayer(${pl.id})">Compra</button>
     </div>` : '';
 
+  const mktPrice = pl.avg_auction_price || null;
   const statsGridHtml = currentAuction ? `
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
       <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
+      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktPrice || '-'}</div><div class="lbl">Media aste</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
       <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
     </div>` : `
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
+      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktPrice || '-'}</div><div class="lbl">Media aste</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price || '-'}</div><div class="lbl">Quotazione</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].appearances : '-'}</div><div class="lbl">Presenze</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].avg_rating : '-'}</div><div class="lbl">Media voto</div></div>
@@ -1457,7 +1467,7 @@ const QUOT_COL_MAP = {
   'qt. a':'initial_price','qt.a':'initial_price','qt. i':'current_price','qt.i':'current_price',
   'prez_a':'initial_price','prez_i':'current_price',
   'rigorista':'is_penalty_taker','rig.':'is_penalty_taker',
-  'fvm':'_fvm',
+  'fvm':'avg_auction_price','fvm m':'avg_auction_price_mantra',
 };
 const STAT_COL_MAP = {
   'presenze':'appearances','pg':'appearances','pv':'appearances',
@@ -1564,8 +1574,8 @@ async function importQuotazioni(file) {
         if (field === 'name' || field.startsWith('_')) continue;
         let val = (row[idx]||'').toString().trim();
         if (!val && val !== '0') continue;
-        if (field === 'initial_price' || field === 'current_price') {
-          data[field] = parseInt(parseFloat(val.replace(',','.'))) || 1;
+        if (field === 'initial_price' || field === 'current_price' || field === 'avg_auction_price' || field === 'avg_auction_price_mantra') {
+          data[field] = parseInt(parseFloat(val.replace(',','.'))) || null;
         } else if (field === 'external_id') {
           data[field] = parseInt(val) || null;
         } else if (field === 'is_penalty_taker') {
