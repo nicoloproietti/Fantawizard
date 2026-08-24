@@ -844,6 +844,7 @@ a { color: var(--accent2); text-decoration: none; }
       <button class="btn-ghost btn-sm" onclick="clearPlan()">Svuota</button>
     </div>
   </div>
+  <div id="plan-modules" class="card" style="margin-bottom:16px;"></div>
   <div id="plan-budget-splits" class="card" style="margin-bottom:16px;"></div>
   <div id="plan-budget-summary" class="card" style="margin-bottom:20px;"></div>
   <div id="plan-roles"></div>
@@ -914,6 +915,7 @@ let bonusMap = {};
 let modFlags = {};
 let rosterSlots = {};
 let budgetSplits = {};
+let selectedFormations = [];
 const FVM_REF_CREDITS = 500;
 
 function getActiveCredits() {
@@ -1564,8 +1566,11 @@ function loadPlan() {
     const raw = localStorage.getItem(getPlanKey());
     if (raw) {
       const data = JSON.parse(raw);
-      if (data.targets) { targetList = data.targets; budgetSplits = data.splits || {}; }
-      else { targetList = data; }
+      if (data.targets) {
+        targetList = data.targets;
+        budgetSplits = data.splits || {};
+        selectedFormations = data.formations || [];
+      } else { targetList = data; }
       return;
     }
   } catch(e) {}
@@ -1573,7 +1578,40 @@ function loadPlan() {
 }
 
 function savePlan() {
-  try { localStorage.setItem(getPlanKey(), JSON.stringify({targets: targetList, splits: budgetSplits})); } catch(e) {}
+  try { localStorage.setItem(getPlanKey(), JSON.stringify({targets: targetList, splits: budgetSplits, formations: selectedFormations})); } catch(e) {}
+}
+
+function getStartersNeeded() {
+  if (!selectedFormations.length) return {P:1, D:4, C:4, A:3};
+  const need = {P:1, D:0, C:0, A:0};
+  for (const f of selectedFormations) {
+    const fm = FORMATIONS[f];
+    if (!fm) continue;
+    for (const r of ['D','C','A']) need[r] = Math.max(need[r], fm[r] || 0);
+  }
+  return need;
+}
+
+function renderModules() {
+  const starters = getStartersNeeded();
+  let html = `<div style="font-size:.82rem;color:var(--text2);margin-bottom:10px;">Moduli (max 4) — Titolari necessari: P:${starters.P} D:${starters.D} C:${starters.C} A:${starters.A}</div>`;
+  html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+  for (const f of Object.keys(FORMATIONS)) {
+    const sel = selectedFormations.includes(f);
+    html += `<button class="btn-ghost btn-sm${sel?' active':''}" style="${sel?'background:var(--accent);color:#000;border-color:var(--accent);':''}" onclick="toggleFormation('${f}')">${f}</button>`;
+  }
+  html += '</div>';
+  document.getElementById('plan-modules').innerHTML = html;
+}
+
+function toggleFormation(f) {
+  const idx = selectedFormations.indexOf(f);
+  if (idx >= 0) { selectedFormations.splice(idx, 1); }
+  else if (selectedFormations.length < 4) { selectedFormations.push(f); }
+  else { toast('Massimo 4 moduli'); return; }
+  savePlan();
+  renderModules();
+  renderPlanBody();
 }
 
 function addTarget(role, playerId, maxPrice) {
@@ -1643,12 +1681,15 @@ function autoFillPlan() {
   const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
   const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
   const splits = Object.keys(budgetSplits).length ? budgetSplits : DEFAULT_BUDGET;
+  const starters = getStartersNeeded();
   targetList = {};
 
   for (const [role, count] of Object.entries(roles)) {
     if (!count) continue;
     const budgetPct = (splits[role] || 0) / 100;
     const roleBudget = Math.round(credits * budgetPct);
+    const nStarters = Math.min(starters[role] || 0, count);
+    const nBench = count - nStarters;
     const rolePlayers = allPlayers.filter(p => p.role_classic === role && !soldIds.has(p.id));
     const scored = rolePlayers.map(pl => {
       const ss = seasonMap[pl.id] || [];
@@ -1661,19 +1702,37 @@ function autoFillPlan() {
       const scarcity = computeScarcity(tier, rt);
       const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
       const rec = recommendedPrice(bp, role, tier, {}, scarcity, 999, mkt);
-      return {playerId: pl.id, adjFma, rec: Math.max(rec, 1)};
+      const value = rec > 0 ? adjFma / rec : adjFma;
+      return {playerId: pl.id, adjFma, rec: Math.max(rec, 1), value};
     });
-    scored.sort((a,b) => b.adjFma - a.adjFma);
+
     let spent = 0;
     targetList[role] = [];
-    for (const s of scored) {
+    const pickedIds = new Set();
+
+    const byFma = [...scored].sort((a,b) => b.adjFma - a.adjFma);
+    for (const s of byFma) {
+      if (targetList[role].length >= nStarters) break;
+      const remaining = roleBudget - spent;
+      const slotsLeft = count - targetList[role].length;
+      const budgetForRest = slotsLeft - 1;
+      if (s.rec > remaining - budgetForRest) continue;
+      const maxPrice = Math.max(s.rec, Math.min(Math.round(s.rec * 1.15), remaining - budgetForRest));
+      targetList[role].push({playerId: s.playerId, maxPrice, starter: true});
+      pickedIds.add(s.playerId);
+      spent += maxPrice;
+    }
+
+    const byValue = [...scored].filter(s => !pickedIds.has(s.playerId)).sort((a,b) => b.value - a.value);
+    for (const s of byValue) {
       if (targetList[role].length >= count) break;
       const remaining = roleBudget - spent;
       const slotsLeft = count - targetList[role].length;
       const budgetForRest = slotsLeft - 1;
       if (s.rec > remaining - budgetForRest) continue;
       const maxPrice = Math.max(s.rec, Math.min(Math.round(s.rec * 1.15), remaining - budgetForRest));
-      targetList[role].push({playerId: s.playerId, maxPrice});
+      targetList[role].push({playerId: s.playerId, maxPrice, starter: false});
+      pickedIds.add(s.playerId);
       spent += maxPrice;
     }
   }
@@ -1732,11 +1791,16 @@ function renderPlanBody() {
   for (const [role, count] of Object.entries(roles)) {
     const tgts = targetList[role] || [];
     const planned = tgts.reduce((a,t) => a + (t.maxPrice || 0), 0);
+    const starters = getStartersNeeded();
+    const nStarters = starters[role] || 0;
+    const filledStarters = tgts.filter(t => t.starter === true).length;
+    const filledBench = tgts.filter(t => t.starter === false).length;
+    const starterInfo = selectedFormations.length ? ` · <span style="color:var(--accent);">${filledStarters}/${nStarters} tit.</span>` : '';
     rolesHtml += `<div class="plan-role-section">
       <div class="plan-role-header">
         <h3>${{P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'}[role]}</h3>
         <div class="plan-role-meta">
-          <span>${tgts.length}/${count} obiettivi</span>
+          <span>${tgts.length}/${count} obiettivi${starterInfo}</span>
           <span style="color:var(--accent);font-weight:700;">${planned}cr</span>
         </div>
       </div>
@@ -1785,10 +1849,15 @@ function renderPlanBody() {
           altsHtml += '</div>';
         }
 
+        const starterBadge = tgt.starter === true
+          ? '<span style="font-size:.65rem;font-weight:700;background:var(--accent);color:#000;padding:1px 6px;border-radius:3px;margin-left:6px;">TIT</span>'
+          : tgt.starter === false
+          ? '<span style="font-size:.65rem;font-weight:700;background:var(--bg3);color:var(--text3);padding:1px 6px;border-radius:3px;margin-left:6px;">PANCH</span>'
+          : '';
         rolesHtml += `<div class="plan-slot${isSold?' sold':''}">
           <div class="plan-slot-num">${i+1}</div>
           <div class="plan-slot-player" onclick="openPlayer(${pl.id})" style="cursor:pointer;">
-            <div class="plan-name">${pl.name} ${isSold?'<span style="font-size:.7rem;color:var(--red);font-weight:600;">VENDUTO</span>':''} ${pl.is_penalty_taker?'<span style="color:var(--yellow);">&#9917;</span>':''}</div>
+            <div class="plan-name">${pl.name}${starterBadge} ${isSold?'<span style="font-size:.7rem;color:var(--red);font-weight:600;">VENDUTO</span>':''} ${pl.is_penalty_taker?'<span style="color:var(--yellow);">&#9917;</span>':''}</div>
             <div class="plan-meta">${pl.team} · F${tier} · FMA adj ${adjFma} · Affid. <span style="color:${relClr};">${relPct}%</span> · Consigliato ~${rec}cr</div>
           </div>
           <div class="plan-slot-prices">
@@ -1827,6 +1896,7 @@ function renderPlanBody() {
 
 function renderPlan() {
   loadPlan();
+  renderModules();
   renderBudgetSplits();
   renderPlanBody();
 }
@@ -1959,6 +2029,10 @@ const MODIFIER_DEFAULTS = [
 ];
 const DEFAULT_ROLES = {P:3,D:8,C:8,A:6};
 const DEFAULT_BUDGET = {P:8,D:20,C:27,A:45};
+const FORMATIONS = {
+  '3-4-3':{D:3,C:4,A:3},'3-5-2':{D:3,C:5,A:2},'4-3-3':{D:4,C:3,A:3},
+  '4-4-2':{D:4,C:4,A:2},'4-5-1':{D:4,C:5,A:1},'5-3-2':{D:5,C:3,A:2},'5-4-1':{D:5,C:4,A:1},
+};
 const BONUS_ROLE_MAP = {
   GOL:'P,D,C,A', GOL_SUBITO:'P', ASSIST:'P,D,C,A', ASSIST_FERMO:'P,D,C,A',
   RIGORE_SEGNATO:'P,D,C,A', RIGORE_SBAGLIATO:'P,D,C,A', RIGORE_PARATO:'P',
