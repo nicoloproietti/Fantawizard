@@ -151,6 +151,8 @@ header nav button:hover, header nav button.active { background:var(--accent); co
       <div id="roster-slots" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
       <h2 style="margin-top:18px;">Budget % per reparto</h2>
       <div id="budget-splits" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+      <h2 style="margin-top:18px;">Nomi squadre</h2>
+      <div id="team-names" style="display:flex;flex-direction:column;gap:6px;"></div>
       <div style="margin-top:16px;"><button class="btn" onclick="createAuction()">Crea Asta</button></div>
       <div id="existing-auctions" style="margin-top:20px;"></div>
     </div>
@@ -495,6 +497,26 @@ function renderSetup() {
       <input type="checkbox" data-mod="${m.code}" class="mod-chk" style="accent-color:var(--accent);"> ${m.label}
     </label>`
   ).join('');
+
+  renderTeamNames();
+  document.getElementById('s-teams').addEventListener('change', renderTeamNames);
+  document.getElementById('s-teams').addEventListener('input', renderTeamNames);
+}
+
+function renderTeamNames() {
+  const n = parseInt(document.getElementById('s-teams').value) || 8;
+  const container = document.getElementById('team-names');
+  const existing = [...container.querySelectorAll('.team-name-input')].map(i => i.value);
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    const val = existing[i] || (i === 0 ? 'La mia squadra' : `Squadra ${i + 1}`);
+    const isUser = i === 0;
+    html += `<div style="display:flex;align-items:center;gap:8px;">
+      <input type="text" class="team-name-input" data-idx="${i}" value="${val}" style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:var(--radius);font-size:.85rem;">
+      ${isUser ? '<span style="font-size:.7rem;color:var(--accent2);white-space:nowrap;">★ Tu</span>' : ''}
+    </div>`;
+  }
+  container.innerHTML = html;
 }
 
 async function loadExistingAuctions() {
@@ -539,8 +561,12 @@ async function createAuction() {
   });
   const bs = [...document.querySelectorAll('.budget-input')].map(i => ({auction_id:aId, role:i.dataset.role, percentage:parseFloat(i.value)||0}));
 
-  const teamInserts = [{auction_id:aId, name:'La mia squadra', is_user:true}];
-  for (let i = 1; i < numTeams; i++) teamInserts.push({auction_id:aId, name:`Squadra ${i+1}`, is_user:false});
+  const teamNameInputs = [...document.querySelectorAll('.team-name-input')];
+  const teamInserts = teamNameInputs.map((inp, i) => ({
+    auction_id: aId,
+    name: inp.value.trim() || (i === 0 ? 'La mia squadra' : `Squadra ${i + 1}`),
+    is_user: i === 0,
+  }));
 
   await Promise.all([
     sb.from('roster_slots').insert(rs),
