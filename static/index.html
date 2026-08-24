@@ -44,63 +44,115 @@ a { color: var(--accent2); text-decoration: none; }
 
 .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
 
-header {
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  padding: 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-header .container {
+.sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 220px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  z-index: 120;
   display: flex;
-  align-items: center;
-  gap: 0;
-  height: 56px;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  overflow-y: auto;
 }
-header h1 {
+.sidebar.open { transform: translateX(0); }
+.sidebar-brand {
+  padding: 20px 20px 16px;
   font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -.02em;
-  white-space: nowrap;
-  margin-right: 32px;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  border-bottom: 1px solid var(--border);
 }
-header nav {
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-}
-header nav button {
+.sidebar nav { display:flex; flex-direction:column; gap:2px; padding:12px 10px; flex:1; }
+.sidebar nav button {
   background: transparent;
   color: var(--text2);
   border: none;
-  padding: 8px 16px;
+  padding: 10px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: .82rem;
+  font-size: .85rem;
   font-weight: 500;
   font-family: var(--font);
   transition: all .15s;
-  position: relative;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   letter-spacing: .01em;
 }
-header nav button:hover {
-  color: var(--text);
-  background: var(--bg3);
+.sidebar nav button:hover { color: var(--text); background: var(--bg3); }
+.sidebar nav button.active { color: var(--accent); background: var(--accent-dim); }
+.sidebar nav button .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-overlay {
+  position: fixed; inset:0; background:rgba(0,0,0,.5); z-index:110; display:none;
 }
-header nav button.active {
-  color: var(--accent);
-  background: var(--accent-dim);
+.sidebar-overlay.open { display:block; }
+.topbar {
+  position: sticky; top:0; z-index:100;
+  background: var(--bg); border-bottom:1px solid var(--border);
+  padding: 0 24px; height:52px;
+  display:flex; align-items:center; gap:12px;
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+}
+.hamburger {
+  background:none; border:none; color:var(--text); cursor:pointer;
+  width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+  border-radius: var(--radius-sm); transition: background .15s;
+}
+.hamburger:hover { background: var(--bg3); }
+.hamburger svg { width:22px; height:22px; }
+.topbar-title {
+  font-size:.88rem; font-weight:600; color:var(--text2);
 }
 
 .view { display:none; padding: 28px 0; }
 .view.active { display:block; }
+
+.db-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.db-toolbar .role-tabs { display:flex; gap:4px; }
+.db-toolbar .role-tabs button {
+  background:var(--bg3); color:var(--text2); border:1px solid var(--border2);
+  padding:7px 16px; border-radius:20px; cursor:pointer; font-size:.8rem;
+  font-weight:600; font-family:var(--font); transition:all .15s;
+}
+.db-toolbar .role-tabs button:hover { background:var(--bg4); color:var(--text); }
+.db-toolbar .role-tabs button.active { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+.db-filter {
+  background:var(--bg3); color:var(--text); border:1px solid var(--border2);
+  padding:7px 12px; border-radius:20px; font-size:.82rem; font-family:var(--font);
+  outline:none; transition:border-color .15s; width:180px;
+}
+.db-filter:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+.db-filter-select {
+  background:var(--bg3); color:var(--text); border:1px solid var(--border2);
+  padding:7px 12px; border-radius:20px; font-size:.82rem; font-family:var(--font);
+  outline:none; cursor:pointer;
+}
+.db-table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg2); }
+.db-table { width:100%; border-collapse:collapse; font-size:.82rem; white-space:nowrap; }
+.db-table th {
+  text-align:left; padding:10px 12px; color:var(--text3); font-size:.7rem;
+  font-weight:600; text-transform:uppercase; letter-spacing:.05em;
+  border-bottom:1px solid var(--border2); cursor:pointer; user-select:none; position:relative;
+}
+.db-table th:hover { color:var(--text); }
+.db-table th.sorted { color:var(--accent); }
+.db-table th .sort-arrow { margin-left:3px; font-size:.65rem; }
+.db-table td { padding:8px 12px; border-bottom:1px solid var(--border); }
+.db-table tr:hover td { background:var(--bg3); }
+.db-table tr { cursor:pointer; }
+.db-table .player-name { font-weight:600; }
+.db-table .team-col { color:var(--text2); }
+.db-table .num-col { text-align:right; font-variant-numeric:tabular-nums; }
+.db-table th.num-col { text-align:right; }
+.db-count { font-size:.78rem; color:var(--text3); margin-left:auto; }
 
 .setup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
 @media(max-width:800px){ .setup-grid{grid-template-columns:1fr;} }
@@ -482,18 +534,24 @@ header nav button.active {
 </head>
 <body>
 
-<header>
-  <div class="container">
-    <h1>FantaWizard</h1>
-    <nav id="nav">
-      <button data-view="setup">Setup</button>
-      <button data-view="data">Dati</button>
-      <button data-view="dashboard" class="active">Asta Live</button>
-      <button data-view="tiers">Tier List</button>
-      <button data-view="teams">Rose</button>
-    </nav>
-  </div>
-</header>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">FantaWizard</div>
+  <nav id="nav">
+    <button data-view="dashboard" class="active"><span class="nav-icon">&#9889;</span>Asta Live</button>
+    <button data-view="players"><span class="nav-icon">&#9917;</span>Giocatori</button>
+    <button data-view="tiers"><span class="nav-icon">&#9776;</span>Tier List</button>
+    <button data-view="teams"><span class="nav-icon">&#128101;</span>Rose</button>
+    <button data-view="data"><span class="nav-icon">&#128194;</span>Dati</button>
+    <button data-view="setup"><span class="nav-icon">&#9881;</span>Setup</button>
+  </nav>
+</aside>
+<div class="topbar">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <span class="topbar-title" id="topbar-title">Asta Live</span>
+</div>
 
 <div id="view-setup" class="view">
 <div class="container">
@@ -621,6 +679,29 @@ header nav button.active {
   <div class="modal" id="modal-content"></div>
 </div>
 
+<div id="view-players" class="view">
+<div class="container">
+  <div class="db-toolbar">
+    <div class="role-tabs" id="db-role-tabs">
+      <button class="active" data-role="ALL">Tutti</button>
+      <button data-role="P">P</button>
+      <button data-role="D">D</button>
+      <button data-role="C">C</button>
+      <button data-role="A">A</button>
+    </div>
+    <input class="db-filter" id="db-search" placeholder="Cerca nome..." type="text">
+    <select class="db-filter-select" id="db-team-filter"><option value="">Tutte le squadre</option></select>
+    <span class="db-count" id="db-count"></span>
+  </div>
+  <div class="db-table-wrap">
+    <table class="db-table" id="db-table">
+      <thead><tr id="db-thead"></tr></thead>
+      <tbody id="db-tbody"></tbody>
+    </table>
+  </div>
+</div>
+</div>
+
 <div id="view-tiers" class="view">
 <div class="container">
   <div class="tier-filter-bar" id="tier-filter-bar">
@@ -681,16 +762,25 @@ function toast(msg) {
 }
 
 // ── Navigation ──
+const VIEW_TITLES = {dashboard:'Asta Live',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
 document.querySelectorAll('#nav button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    document.getElementById('topbar-title').textContent = VIEW_TITLES[btn.dataset.view] || '';
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('open');
     if (btn.dataset.view === 'data') refreshDataSummary();
     if (btn.dataset.view === 'dashboard' && currentAuction) refreshDashboard();
     if (btn.dataset.view === 'tiers') showTierRole('A');
     if (btn.dataset.view === 'teams' && currentAuction) refreshTeams();
+    if (btn.dataset.view === 'players') renderPlayersDB();
   });
 });
 
@@ -1100,6 +1190,9 @@ document.getElementById('player-search').addEventListener('input', (e) => {
 });
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.search-box')) document.getElementById('search-results').classList.remove('open');
+});
+document.getElementById('credit-ref').addEventListener('change', () => {
+  if (document.getElementById('view-players').classList.contains('active')) renderPlayersDB();
 });
 
 function searchPlayers(q) {
@@ -1625,6 +1718,123 @@ function fuzzyMatch(name, candidates, threshold=0.6) {
   }
   return bestScore >= threshold ? bestId : null;
 }
+
+// ── Players DB ──
+let dbSort = {col:'fma', dir:'desc'};
+let dbRole = 'ALL';
+let dbSearch = '';
+let dbTeam = '';
+
+const DB_COLS = [
+  {key:'name', label:'Giocatore', cls:'player-name'},
+  {key:'team', label:'Squadra', cls:'team-col'},
+  {key:'role_classic', label:'R', cls:''},
+  {key:'fma', label:'FMA', cls:'num-col', num:true},
+  {key:'rec', label:'Consigliato', cls:'num-col', num:true},
+  {key:'mkt', label:'Media aste', cls:'num-col', num:true},
+  {key:'initial_price', label:'Quot.', cls:'num-col', num:true},
+  {key:'avg_rating', label:'MV', cls:'num-col', num:true},
+  {key:'fanta_avg', label:'FM', cls:'num-col', num:true},
+  {key:'appearances', label:'Pres', cls:'num-col', num:true},
+  {key:'goals', label:'Gol', cls:'num-col', num:true},
+  {key:'assists', label:'Ass', cls:'num-col', num:true},
+];
+
+function renderPlayersDB() {
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const credits = getActiveCredits();
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  const numTeams = auctionData?.num_teams || 10;
+
+  const teamSet = new Set();
+  const rows = allPlayers.map(pl => {
+    const ss = seasonMap[pl.id] || [];
+    const s0 = ss[0] || {};
+    const fma = projectFMA(pl, ss);
+    const bp = basePrice(fma, pl.role_classic, credits, numTeams, totalSlots);
+    const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+    const scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
+    const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
+    const rec = recommendedPrice(bp, pl.role_classic, tier, {}, scarcity, 999, mkt);
+    teamSet.add(pl.team);
+    return {
+      id:pl.id, name:pl.name, team:pl.team, role_classic:pl.role_classic,
+      fma, rec, mkt: mkt||0, initial_price:pl.initial_price||0,
+      avg_rating: s0.avg_rating||0, fanta_avg: s0.fanta_avg||0,
+      appearances: s0.appearances||0, goals: s0.goals||0, assists: s0.assists||0,
+      tier, is_penalty_taker:pl.is_penalty_taker, sold:soldIds.has(pl.id),
+    };
+  });
+
+  const sel = document.getElementById('db-team-filter');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Tutte le squadre</option>' +
+    [...teamSet].sort().map(t => `<option value="${t}">${t}</option>`).join('');
+  sel.value = prev || dbTeam;
+
+  let filtered = rows;
+  if (dbRole !== 'ALL') filtered = filtered.filter(r => r.role_classic === dbRole);
+  if (dbSearch) { const q = dbSearch.toLowerCase(); filtered = filtered.filter(r => r.name.toLowerCase().includes(q)); }
+  if (dbTeam) filtered = filtered.filter(r => r.team === dbTeam);
+
+  const col = DB_COLS.find(c => c.key === dbSort.col) || DB_COLS[3];
+  filtered.sort((a,b) => {
+    let va = a[col.key], vb = b[col.key];
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    if (va < vb) return dbSort.dir === 'asc' ? -1 : 1;
+    if (va > vb) return dbSort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  document.getElementById('db-thead').innerHTML = DB_COLS.map(c => {
+    const sorted = dbSort.col === c.key;
+    const arrow = sorted ? (dbSort.dir === 'asc' ? '&#9650;' : '&#9660;') : '';
+    return `<th class="${c.num?'num-col':''} ${sorted?'sorted':''}" data-col="${c.key}">${c.label}<span class="sort-arrow">${arrow}</span></th>`;
+  }).join('');
+
+  document.getElementById('db-tbody').innerHTML = filtered.map(r => {
+    const tierCls = `t${r.tier}`;
+    return `<tr onclick="openPlayer(${r.id})" class="${r.sold?'sold':''}">
+      <td class="player-name">${r.name} ${r.is_penalty_taker?'<span title="Rigorista" style="color:var(--yellow);">&#9917;</span>':''}</td>
+      <td class="team-col">${r.team}</td>
+      <td><span class="price-tag ${tierCls}" style="font-size:.7rem;padding:2px 8px;">${r.role_classic}</span></td>
+      <td class="num-col" style="font-weight:700;color:var(--accent);">${r.fma}</td>
+      <td class="num-col" style="font-weight:700;color:var(--green);">${r.rec}</td>
+      <td class="num-col" style="color:#26c6da;">${r.mkt||'-'}</td>
+      <td class="num-col">${r.initial_price||'-'}</td>
+      <td class="num-col">${r.avg_rating||'-'}</td>
+      <td class="num-col">${r.fanta_avg||'-'}</td>
+      <td class="num-col">${r.appearances||'-'}</td>
+      <td class="num-col">${r.goals||'-'}</td>
+      <td class="num-col">${r.assists||'-'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('db-count').textContent = `${filtered.length} giocatori`;
+}
+
+document.getElementById('db-role-tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('#db-role-tabs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  dbRole = btn.dataset.role;
+  renderPlayersDB();
+});
+document.getElementById('db-search').addEventListener('input', (e) => { dbSearch = e.target.value.trim(); renderPlayersDB(); });
+document.getElementById('db-team-filter').addEventListener('change', (e) => { dbTeam = e.target.value; renderPlayersDB(); });
+document.getElementById('db-table').querySelector('thead').addEventListener('click', (e) => {
+  const th = e.target.closest('th');
+  if (!th || !th.dataset.col) return;
+  if (dbSort.col === th.dataset.col) {
+    dbSort.dir = dbSort.dir === 'desc' ? 'asc' : 'desc';
+  } else {
+    dbSort.col = th.dataset.col;
+    dbSort.dir = th.dataset.col === 'name' || th.dataset.col === 'team' ? 'asc' : 'desc';
+  }
+  renderPlayersDB();
+});
 
 async function importQuotazioni(file) {
   const statusEl = document.getElementById('quotazioni-status');
