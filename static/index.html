@@ -587,9 +587,15 @@ header nav button.active {
 
 <div id="view-dashboard" class="view active">
 <div class="container">
-  <div class="search-box" style="margin-bottom:24px;">
-    <input id="player-search" placeholder="Cerca giocatore..." autocomplete="off">
-    <div class="search-results" id="search-results"></div>
+  <div style="display:flex;gap:10px;align-items:stretch;margin-bottom:24px;">
+    <div class="search-box" style="flex:1;">
+      <input id="player-search" placeholder="Cerca giocatore..." autocomplete="off">
+      <div class="search-results" id="search-results"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;background:var(--bg2);border:2px solid var(--border2);border-radius:var(--radius-lg);padding:0 12px;white-space:nowrap;">
+      <input id="credit-ref" type="number" min="100" max="5000" step="50" value="500" style="width:58px;background:transparent;border:none;color:#26c6da;font-size:1rem;font-weight:700;font-family:var(--font);text-align:right;outline:none;">
+      <span style="color:var(--text3);font-size:.82rem;">cr</span>
+    </div>
   </div>
   <div class="dash-top">
     <div>
@@ -653,9 +659,14 @@ let rosterSlots = {};
 let budgetSplits = {};
 const FVM_REF_CREDITS = 500;
 
+function getActiveCredits() {
+  const el = document.getElementById('credit-ref');
+  return parseInt(el?.value) || FVM_REF_CREDITS;
+}
+
 function scaleMarketPrice(rawFvm, auctionCredits) {
   if (!rawFvm || rawFvm <= 0) return null;
-  const credits = auctionCredits || FVM_REF_CREDITS;
+  const credits = auctionCredits || getActiveCredits();
   return Math.max(1, Math.round(rawFvm * credits / FVM_REF_CREDITS));
 }
 
@@ -1063,6 +1074,7 @@ async function loadAuction(id) {
   currentAuction = id;
   auctionData = auction;
   teamsCache = teams || [];
+  document.getElementById('credit-ref').value = auction.initial_credits;
 
   bonusMap = {};
   for (const b of (bonus||[])) { if (b.enabled) bonusMap[b.code] = b.value; }
@@ -1092,26 +1104,27 @@ document.addEventListener('click', (e) => {
 
 function searchPlayers(q) {
   const seasonMap = buildSeasonMap();
-  const purchases = [...soldIds].map(id => ({player_id: id}));
   const playerMap = buildPlayerMap();
   const filtered = allPlayers.filter(p => p.name.toLowerCase().includes(q)).slice(0, 15);
-  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0);
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
   const tierData = computeTiers(allPlayers, seasonMap);
   const el = document.getElementById('search-results');
+  const credits = getActiveCredits();
 
-  sb.from('purchases').select('*').eq('auction_id', currentAuction).then(({data: purch}) => {
-    const infl = computeInflation(purch||[], playerMap, seasonMap);
+  const renderResults = (purch) => {
+    const infl = currentAuction ? computeInflation(purch, playerMap, seasonMap) : {};
     const userTeam = teamsCache.find(t => t.is_user);
-    const userPurchases = (purch||[]).filter(p => p.team_id === userTeam?.id);
-    const mb = computeMaxBid(auctionData, userPurchases);
+    const userPurchases = currentAuction ? purch.filter(p => p.team_id === userTeam?.id) : [];
+    const mb = currentAuction ? computeMaxBid(auctionData, userPurchases) : 999;
+    const numTeams = auctionData?.num_teams || 10;
 
     const results = filtered.map(pl => {
       const ss = seasonMap[pl.id] || [];
       const fma = projectFMA(pl, ss);
-      const bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
+      const bp = basePrice(fma, pl.role_classic, credits, numTeams, totalSlots);
       const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
       const scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
-      const mkt = scaleMarketPrice(pl.avg_auction_price, auctionData.initial_credits);
+      const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
       const rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, mkt);
       return {...pl, fma, bp, rec, tier, mb, mkt, sold: soldIds.has(pl.id)};
     });
@@ -1131,7 +1144,13 @@ function searchPlayers(q) {
       </div>
     `).join('');
     el.classList.add('open');
-  });
+  };
+
+  if (currentAuction) {
+    sb.from('purchases').select('*').eq('auction_id', currentAuction).then(({data: purch}) => renderResults(purch||[]));
+  } else {
+    renderResults([]);
+  }
 }
 
 function svgBarChart(seasons, series, height = 120) {
@@ -1253,6 +1272,7 @@ async function openPlayer(id) {
   let infl = {}, tier = 4, scarcity = 1, mb = 999, fma = 0, bp = 0, rec = 0;
   let purch = [];
 
+  const credits = getActiveCredits();
   if (currentAuction) {
     const res = await sb.from('purchases').select('*').eq('auction_id', currentAuction);
     purch = res.data || [];
@@ -1261,16 +1281,19 @@ async function openPlayer(id) {
     const userPurchases = purch.filter(p => p.team_id === userTeam?.id);
     mb = computeMaxBid(auctionData, userPurchases);
     fma = projectFMA(pl, ss);
-    bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
+    bp = basePrice(fma, pl.role_classic, credits, auctionData.num_teams, totalSlots);
     tier = getPlayerTier(pl.id, pl.role_classic, tierData);
     scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
-    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, scaleMarketPrice(pl.avg_auction_price, auctionData.initial_credits));
+    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, scaleMarketPrice(pl.avg_auction_price, credits));
   } else {
     if (!Object.keys(bonusMap).length) {
       for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
     }
     fma = projectFMA(pl, ss);
+    bp = basePrice(fma, pl.role_classic, credits, 10, totalSlots);
     tier = getPlayerTier(pl.id, pl.role_classic, tierData);
+    scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
+    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, scaleMarketPrice(pl.avg_auction_price, credits));
   }
 
   const isGoalkeeper = pl.role_classic === 'P';
@@ -1293,12 +1316,12 @@ async function openPlayer(id) {
     </div>` : '';
 
   const mktRaw = pl.avg_auction_price || null;
-  const mktScaled = currentAuction ? scaleMarketPrice(mktRaw, auctionData.initial_credits) : mktRaw;
-  const isScaled = currentAuction && mktRaw && auctionData.initial_credits !== FVM_REF_CREDITS;
+  const mktScaled = scaleMarketPrice(mktRaw, credits);
+  const isScaled = mktRaw && credits !== FVM_REF_CREDITS;
   const mktValHtml = mktScaled ? (isScaled
     ? `${mktScaled}<span style="font-size:.65rem;color:var(--text3);font-weight:400;display:block;">${mktRaw}@${FVM_REF_CREDITS}cr</span>`
     : `${mktScaled}`) : '-';
-  const mktLabel = isScaled ? `Media aste (${auctionData.initial_credits}cr)` : 'Media aste';
+  const mktLabel = isScaled ? `Media aste (${credits}cr)` : 'Media aste';
   const statsGridHtml = currentAuction ? `
     <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
@@ -1309,9 +1332,9 @@ async function openPlayer(id) {
     </div>` : `
     <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
-      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktScaled || '-'}</div><div class="lbl">Media aste</div></div>
+      <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
+      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktValHtml}</div><div class="lbl">${mktLabel}</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price || '-'}</div><div class="lbl">Quotazione</div></div>
-      <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].appearances : '-'}</div><div class="lbl">Presenze</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].avg_rating : '-'}</div><div class="lbl">Media voto</div></div>
     </div>`;
 
