@@ -96,7 +96,6 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .sidebar nav button:hover { color: var(--text); background: var(--bg3); border-left-color: var(--text3); }
 .sidebar nav button.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
-.sidebar nav button.nav-disabled { opacity:.3; pointer-events:none; }
 .sidebar nav button .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
 .sidebar-overlay {
   position: fixed; inset:0; background:rgba(0,0,0,.5); z-index:110; display:none;
@@ -529,12 +528,11 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .data-stat strong { color: var(--accent); font-weight: 700; }
 
+/* ── Toast variants ── */
 .toast {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: linear-gradient(135deg, var(--accent), #1a9fc7);
-  color: #fff;
   padding: 14px 24px;
   border-radius: var(--radius);
   font-weight: 700;
@@ -544,9 +542,69 @@ a { color: var(--accent2); text-decoration: none; }
   box-shadow: var(--shadow-lg);
   text-shadow: 0 1px 2px rgba(0,0,0,.3);
   letter-spacing:.02em;
+  background: linear-gradient(135deg, var(--accent), #1a9fc7);
+  color: #fff;
 }
-.toast.show { display:block; animation: toastIn 2.5s forwards; }
-@keyframes toastIn { 0%{opacity:0;transform:translateY(10px)} 10%{opacity:1;transform:translateY(0)} 75%{opacity:1} 100%{opacity:0} }
+.toast.toast-success { background: linear-gradient(135deg, var(--green), #1a9f5a); }
+.toast.toast-error { background: linear-gradient(135deg, var(--red), #b93a2a); }
+.toast.toast-warning { background: linear-gradient(135deg, var(--yellow), #d4a017); color:#000; text-shadow:none; }
+.toast.show { display:block; animation: toastIn 2.8s forwards; }
+@keyframes toastIn { 0%{opacity:0;transform:translateY(10px)} 8%{opacity:1;transform:translateY(0)} 75%{opacity:1} 100%{opacity:0} }
+
+/* ── Loading overlay ── */
+.loading-overlay {
+  position:fixed; inset:0; background:rgba(11,17,32,.7); z-index:250;
+  display:none; align-items:center; justify-content:center; backdrop-filter:blur(4px);
+}
+.loading-overlay.active { display:flex; }
+.loading-spinner {
+  width:40px; height:40px; border:3px solid var(--border2);
+  border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite;
+}
+.loading-label { color:var(--text2); font-size:.82rem; margin-top:10px; text-align:center; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ── Confirm dialog ── */
+.confirm-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:260;
+  display:none; align-items:center; justify-content:center; backdrop-filter:blur(3px);
+}
+.confirm-overlay.active { display:flex; }
+.confirm-box {
+  background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius-lg);
+  padding:28px; max-width:380px; width:90vw; text-align:center; box-shadow:var(--shadow-lg);
+}
+.confirm-box h3 { font-family:var(--font-display); font-size:1.2rem; text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+.confirm-box p { font-size:.85rem; color:var(--text2); line-height:1.5; margin-bottom:20px; }
+.confirm-box .confirm-actions { display:flex; gap:10px; justify-content:center; }
+
+/* ── Welcome screen ── */
+.welcome-screen {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:60px 24px; max-width:540px; margin:0 auto;
+}
+.welcome-screen h1 { font-family:var(--font-display); font-size:2.4rem; letter-spacing:.06em; text-transform:uppercase; background:linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px; }
+.welcome-screen .welcome-sub { color:var(--text2); font-size:.95rem; line-height:1.6; margin-bottom:32px; }
+.welcome-steps { display:flex; flex-direction:column; gap:14px; width:100%; text-align:left; margin-bottom:32px; }
+.welcome-step {
+  display:flex; gap:14px; align-items:center; padding:16px; background:var(--bg2);
+  border:1px solid var(--border); border-radius:var(--radius); transition:border-color .15s;
+}
+.welcome-step.done { border-color:var(--green); opacity:.6; }
+.welcome-step-num { width:32px; height:32px; border-radius:50%; background:var(--accent-dim); color:var(--accent); font-weight:800; font-size:.9rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.welcome-step.done .welcome-step-num { background:rgba(46,204,113,.15); color:var(--green); }
+.welcome-step-text { font-size:.88rem; }
+.welcome-step-text strong { color:var(--text); }
+.welcome-step-text span { color:var(--text2); font-size:.78rem; display:block; margin-top:2px; }
+
+/* ── Nav tooltip ── */
+.sidebar nav button.nav-disabled { opacity:.3; pointer-events:auto; cursor:not-allowed; position:relative; }
+.sidebar nav button.nav-disabled:hover::after {
+  content:attr(data-tooltip); position:absolute; left:100%; top:50%; transform:translateY(-50%);
+  background:var(--bg); border:1px solid var(--border2); color:var(--text2); font-size:.7rem;
+  padding:4px 10px; border-radius:var(--radius-sm); white-space:nowrap; z-index:200;
+  pointer-events:none; box-shadow:var(--shadow);
+}
 
 .tier-filter-bar { display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap; }
 .tier-filter-bar button {
@@ -715,17 +773,23 @@ a { color: var(--accent2); text-decoration: none; }
 </head>
 <body>
 
+<div class="loading-overlay" id="loading-overlay">
+  <div><div class="loading-spinner"></div><div class="loading-label" id="loading-label">Caricamento...</div></div>
+</div>
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box" id="confirm-box"></div>
+</div>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">FantaWizard</div>
   <nav id="nav">
-    <button data-view="dashboard" data-needs-auction="1"><span class="nav-icon">&#9889;</span>Asta Live</button>
-    <button data-view="plan" data-needs-auction="1"><span class="nav-icon">&#127919;</span>Piano Asta</button>
-    <button data-view="players"><span class="nav-icon">&#9917;</span>Giocatori</button>
-    <button data-view="tiers" class="active"><span class="nav-icon">&#9776;</span>Tier List</button>
-    <button data-view="teams" data-needs-auction="1"><span class="nav-icon">&#128101;</span>Rose</button>
-    <button data-view="data" data-needs-auction="1"><span class="nav-icon">&#128194;</span>Dati</button>
     <button data-view="setup"><span class="nav-icon">&#9881;</span>Setup</button>
+    <button data-view="data" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#128194;</span>Dati</button>
+    <button data-view="tiers" class="active"><span class="nav-icon">&#9776;</span>Tier List</button>
+    <button data-view="plan" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#127919;</span>Piano Asta</button>
+    <button data-view="dashboard" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#9889;</span>Asta Live</button>
+    <button data-view="teams" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#128101;</span>Rose</button>
+    <button data-view="players"><span class="nav-icon">&#9917;</span>Giocatori</button>
   </nav>
 </aside>
 <div class="topbar">
@@ -734,6 +798,12 @@ a { color: var(--accent2); text-decoration: none; }
   </button>
   <span class="topbar-title" id="topbar-title">Tier List</span>
   <div id="auction-indicator" style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.82rem;"></div>
+</div>
+
+<div id="view-welcome" class="view">
+<div class="container">
+  <div class="welcome-screen" id="welcome-content"></div>
+</div>
 </div>
 
 <div id="view-setup" class="view">
@@ -833,7 +903,8 @@ a { color: var(--accent2); text-decoration: none; }
       <input id="player-search" placeholder="Cerca giocatore..." autocomplete="off">
       <div class="search-results" id="search-results"></div>
     </div>
-    <div style="display:flex;align-items:center;gap:4px;background:var(--bg2);border:2px solid var(--border2);border-radius:var(--radius-lg);padding:0 12px;white-space:nowrap;">
+    <div style="display:flex;align-items:center;gap:4px;background:var(--bg2);border:2px solid var(--border2);border-radius:var(--radius-lg);padding:0 12px;white-space:nowrap;" title="Crediti totali per squadra. Usato per scalare i prezzi consigliati.">
+      <span style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;">Budget</span>
       <input id="credit-ref" type="number" min="100" max="5000" step="50" value="500" style="width:58px;background:transparent;border:none;color:#2fc5ee;font-size:1rem;font-weight:700;font-family:var(--font);text-align:right;outline:none;">
       <span style="color:var(--text3);font-size:.82rem;">cr</span>
     </div>
@@ -999,17 +1070,46 @@ function scaleMarketPrice(rawFvm, auctionCredits) {
 }
 
 // ── Toast ──
-function toast(msg) {
+function toast(msg, variant) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.remove('show');
+  t.className = 'toast';
+  if (variant) t.classList.add('toast-' + variant);
   void t.offsetWidth;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  const dur = variant === 'error' ? 4000 : 2800;
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── Loading overlay ──
+function showLoading(label) {
+  document.getElementById('loading-label').textContent = label || 'Caricamento...';
+  document.getElementById('loading-overlay').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('active');
+}
+
+// ── Confirm dialog ──
+function confirmDialog(title, message, confirmLabel, onConfirm) {
+  const box = document.getElementById('confirm-box');
+  box.innerHTML = `<h3>${title}</h3><p>${message}</p>
+    <div class="confirm-actions">
+      <button class="btn" id="confirm-yes">${confirmLabel || 'Conferma'}</button>
+      <button class="btn-ghost" id="confirm-no">Annulla</button>
+    </div>`;
+  document.getElementById('confirm-overlay').classList.add('active');
+  document.getElementById('confirm-yes').onclick = () => {
+    document.getElementById('confirm-overlay').classList.remove('active');
+    onConfirm();
+  };
+  document.getElementById('confirm-no').onclick = () => {
+    document.getElementById('confirm-overlay').classList.remove('active');
+  };
 }
 
 // ── Navigation ──
-const VIEW_TITLES = {dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
+const VIEW_TITLES = {welcome:'Benvenuto',dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
 const AUCTION_VIEWS = ['dashboard','plan','teams','data'];
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -1053,19 +1153,22 @@ function renderAuctionIndicator() {
 }
 
 function closeAuction() {
-  if (purchaseSub) { sb.removeChannel(purchaseSub); purchaseSub = null; }
-  currentAuction = null;
-  auctionData = null;
-  teamsCache = [];
-  soldIds = new Set();
-  userSoldIds = new Set();
-  bonusMap = {};
-  modFlags = {};
-  rosterSlots = {};
-  document.getElementById('strategy-section').style.display = 'none';
-  document.getElementById('analytics-section').style.display = 'none';
-  updateNavState();
-  toast('Asta chiusa');
+  confirmDialog('Chiudi asta', 'Vuoi chiudere l\'asta corrente? Potrai riaprirla da Setup.', 'Chiudi', () => {
+    if (purchaseSub) { sb.removeChannel(purchaseSub); purchaseSub = null; }
+    currentAuction = null;
+    auctionData = null;
+    teamsCache = [];
+    soldIds = new Set();
+    userSoldIds = new Set();
+    bonusMap = {};
+    modFlags = {};
+    rosterSlots = {};
+    document.getElementById('strategy-section').style.display = 'none';
+    document.getElementById('analytics-section').style.display = 'none';
+    updateNavState();
+    renderWelcome();
+    toast('Asta chiusa', 'warning');
+  });
 }
 
 document.querySelectorAll('#nav button').forEach(btn => {
@@ -1554,17 +1657,22 @@ function changeBid(delta) {
   document.getElementById('call-price-bar').innerHTML = renderPriceBar(range, currentBid);
 }
 
-async function quickBuy() {
+function quickBuy() {
   if (!currentAuction || !calledPlayer) return;
   const userTeam = teamsCache.find(t => t.is_user);
-  if (!userTeam) { alert('Nessuna squadra utente trovata'); return; }
-  const {error} = await sb.from('purchases').insert({auction_id:currentAuction, player_id:calledPlayer.id, team_id:userTeam.id, price:currentBid});
-  if (error) { alert(error.message); return; }
-  soldIds.add(calledPlayer.id);
-  userSoldIds.add(calledPlayer.id);
-  toast(`${calledPlayer.name} acquistato a ${currentBid}!`);
-  closeCallPanel();
-  refreshDashboard();
+  if (!userTeam) { toast('Nessuna squadra utente trovata', 'error'); return; }
+  const name = calledPlayer.name;
+  const price = currentBid;
+  const pid = calledPlayer.id;
+  confirmDialog('Conferma acquisto', `Comprare <strong>${name}</strong> per <strong>${price} crediti</strong>?`, 'Compra', async () => {
+    const {error} = await sb.from('purchases').insert({auction_id:currentAuction, player_id:pid, team_id:userTeam.id, price});
+    if (error) { toast(error.message, 'error'); return; }
+    soldIds.add(pid);
+    userSoldIds.add(pid);
+    toast(`${name} acquistato a ${price}!`, 'success');
+    closeCallPanel();
+    refreshDashboard();
+  });
 }
 
 async function assignToOther() {
@@ -1594,10 +1702,10 @@ async function confirmAssign() {
   const price = parseInt(document.getElementById('assign-price').value);
   if (!teamId || !price || !calledPlayer) return;
   const {error} = await sb.from('purchases').insert({auction_id:currentAuction, player_id:calledPlayer.id, team_id:teamId, price});
-  if (error) { alert(error.message); return; }
+  if (error) { toast(error.message, 'error'); return; }
   soldIds.add(calledPlayer.id);
   const team = teamsCache.find(t => t.id === teamId);
-  toast(`${calledPlayer.name} assegnato a ${team?.name} per ${price}`);
+  toast(`${calledPlayer.name} assegnato a ${team?.name} per ${price}`, 'success');
   closeCallPanel();
   refreshDashboard();
 }
@@ -2546,7 +2654,7 @@ async function createAuction() {
     name, mode, auction_type: atype, num_teams: numTeams,
     initial_credits: credits, num_matchdays: matchdays
   }).select().single();
-  if (error) { alert('Errore: ' + error.message); return; }
+  if (error) { toast('Errore: ' + error.message, 'error'); return; }
 
   const aId = auction.id;
   const rs = [...document.querySelectorAll('.roster-input')].map(i => ({auction_id:aId, role:i.dataset.role, count:parseInt(i.value)||0}));
@@ -2580,42 +2688,46 @@ async function createAuction() {
     sb.from('teams').insert(teamInserts),
   ]);
 
-  toast('Asta creata!');
+  toast('Asta creata!', 'success');
   await loadAuction(aId);
 }
 
 async function loadAuction(id) {
-  const [{data:auction}, {data:bonus}, {data:mods}, {data:slots}, {data:splits}, {data:teams}] = await Promise.all([
-    sb.from('auctions').select('*').eq('id', id).single(),
-    sb.from('bonus_rules').select('*').eq('auction_id', id),
-    sb.from('modifiers').select('*').eq('auction_id', id),
-    sb.from('roster_slots').select('*').eq('auction_id', id),
-    sb.from('budget_splits').select('*').eq('auction_id', id),
-    sb.from('teams').select('*').eq('auction_id', id),
-  ]);
+  showLoading('Caricamento asta...');
+  try {
+    const [{data:auction}, {data:bonus}, {data:mods}, {data:slots}, {data:splits}, {data:teams}] = await Promise.all([
+      sb.from('auctions').select('*').eq('id', id).single(),
+      sb.from('bonus_rules').select('*').eq('auction_id', id),
+      sb.from('modifiers').select('*').eq('auction_id', id),
+      sb.from('roster_slots').select('*').eq('auction_id', id),
+      sb.from('budget_splits').select('*').eq('auction_id', id),
+      sb.from('teams').select('*').eq('auction_id', id),
+    ]);
 
-  currentAuction = id;
-  auctionData = auction;
-  teamsCache = teams || [];
-  document.getElementById('credit-ref').value = auction.initial_credits;
+    currentAuction = id;
+    auctionData = auction;
+    teamsCache = teams || [];
+    document.getElementById('credit-ref').value = auction.initial_credits;
 
-  bonusMap = {};
-  for (const b of (bonus||[])) { if (b.enabled) bonusMap[b.code] = b.value; }
-  modFlags = {};
-  for (const m of (mods||[])) modFlags[m.code] = m.enabled;
-  rosterSlots = {};
-  for (const s of (slots||[])) rosterSlots[s.role] = s.count;
-  budgetSplits = {};
-  for (const s of (splits||[])) budgetSplits[s.role] = s.percentage;
+    bonusMap = {};
+    for (const b of (bonus||[])) { if (b.enabled) bonusMap[b.code] = b.value; }
+    modFlags = {};
+    for (const m of (mods||[])) modFlags[m.code] = m.enabled;
+    rosterSlots = {};
+    for (const s of (slots||[])) rosterSlots[s.role] = s.count;
+    budgetSplits = {};
+    for (const s of (splits||[])) budgetSplits[s.role] = s.percentage;
 
-  await loadAllData();
-  await loadAuctionPurchases();
-  loadPlan();
-  document.getElementById('strategy-section').style.display = '';
-  updateNavState();
-  loadExistingAuctions();
-  subscribePurchases();
-  navigateTo('dashboard');
+    await loadAllData();
+    await loadAuctionPurchases();
+    loadPlan();
+    document.getElementById('strategy-section').style.display = '';
+    updateNavState();
+    loadExistingAuctions();
+    subscribePurchases();
+    renderWelcome();
+    navigateTo('dashboard');
+  } finally { hideLoading(); }
 }
 
 let purchaseSub = null;
@@ -2809,6 +2921,8 @@ async function openPlayer(id) {
   document.getElementById('search-results').classList.remove('open');
   const pl = allPlayers.find(p => p.id === id);
   if (!pl) return;
+  document.getElementById('modal-content').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:60px;"><div class="loading-spinner"></div></div>';
+  document.getElementById('player-modal').classList.add('open');
   const seasonMap = buildSeasonMap();
   const ss = seasonMap[pl.id] || [];
   const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
@@ -2904,6 +3018,7 @@ async function openPlayer(id) {
       <button onclick="document.getElementById('player-modal').classList.remove('open')" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;font-family:var(--font);">&#x2715;</button>
     </div>
     ${statsGridHtml}
+    ${purchaseHtml}
     ${gaugeHtml}
     <div class="chart-row">
       <div class="chart-card">
@@ -2992,26 +3107,25 @@ async function openPlayer(id) {
         </div>
       </div>`;
     })()}
-    ${purchaseHtml}
   `;
-  document.getElementById('player-modal').classList.add('open');
   if (currentAuction) setTimeout(() => { const bp = document.getElementById('buy-price'); if(bp){bp.focus();bp.select();} }, 100);
 }
 
-async function buyPlayer(playerId) {
+function buyPlayer(playerId) {
   const price = parseInt(document.getElementById('buy-price').value);
   const teamId = parseInt(document.getElementById('buy-team').value);
   if (!price || price < 1) return;
-
-  const {error} = await sb.from('purchases').insert({auction_id:currentAuction, player_id:playerId, team_id:teamId, price});
-  if (error) { alert(error.message); return; }
-
-  soldIds.add(playerId);
-  document.getElementById('player-modal').classList.remove('open');
-  document.getElementById('player-search').value = '';
   const pl = allPlayers.find(p => p.id === playerId);
-  toast(`${pl?.name || 'Giocatore'} acquistato a ${price}!`);
-  refreshDashboard();
+  const team = teamsCache.find(t => t.id === teamId);
+  confirmDialog('Conferma acquisto', `Comprare <strong>${pl?.name||'Giocatore'}</strong> per <strong>${price} crediti</strong> a <strong>${team?.name||'?'}</strong>?`, 'Compra', async () => {
+    const {error} = await sb.from('purchases').insert({auction_id:currentAuction, player_id:playerId, team_id:teamId, price});
+    if (error) { toast(error.message, 'error'); return; }
+    soldIds.add(playerId);
+    document.getElementById('player-modal').classList.remove('open');
+    document.getElementById('player-search').value = '';
+    toast(`${pl?.name || 'Giocatore'} acquistato a ${price}!`, 'success');
+    refreshDashboard();
+  });
 }
 
 async function refreshDashboard() {
@@ -3039,11 +3153,13 @@ async function refreshPurchases() {
   `).join('');
 }
 
-async function undoPurchase(id, playerId) {
-  await sb.from('purchases').delete().eq('id', id);
-  soldIds.delete(playerId);
-  toast('Acquisto annullato');
-  refreshDashboard();
+function undoPurchase(id, playerId) {
+  confirmDialog('Annulla acquisto', 'Sei sicuro di voler annullare questo acquisto?', 'Annulla acquisto', async () => {
+    await sb.from('purchases').delete().eq('id', id);
+    soldIds.delete(playerId);
+    toast('Acquisto annullato', 'warning');
+    refreshDashboard();
+  });
 }
 
 async function refreshBudget() {
@@ -3432,9 +3548,10 @@ async function importQuotazioni(file) {
     }
 
     statusEl.innerHTML = `<span style="color:var(--green);">Importati ${count} giocatori (${updated} aggiornati, ${count - updated} nuovi)</span>`;
-    toast(`${count} giocatori importati!`);
+    toast(`${count} giocatori importati!`, 'success');
     await loadAllData();
     refreshDataSummary();
+    renderWelcome();
   } catch(err) {
     statusEl.innerHTML = `<span style="color:var(--red);">Errore: ${err.message}</span>`;
   } finally {
@@ -3527,9 +3644,10 @@ async function importStats(file) {
     }
 
     statusEl.innerHTML = `<span style="color:var(--green);">Importati ${count} record per ${season} (${skipped} non trovati)</span>`;
-    toast(`Statistiche ${season}: ${count} importate!`);
+    toast(`Statistiche ${season}: ${count} importate!`, 'success');
     await loadAllData();
     refreshDataSummary();
+    renderWelcome();
   } catch(err) {
     statusEl.innerHTML = `<span style="color:var(--red);">Errore: ${err.message}</span>`;
   } finally {
@@ -3585,6 +3703,10 @@ async function refreshDataSummary() {
 // ── Keyboard shortcuts ──
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (document.getElementById('confirm-overlay').classList.contains('active')) {
+      document.getElementById('confirm-overlay').classList.remove('active');
+      return;
+    }
     document.getElementById('player-modal').classList.remove('open');
     document.getElementById('search-results').classList.remove('open');
   }
@@ -3594,11 +3716,65 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ── Welcome / Onboarding ──
+function renderWelcome() {
+  const el = document.getElementById('welcome-content');
+  if (!el) return;
+  const hasData = allPlayers.length > 0;
+  const hasSeasons = allSeasons.length > 0;
+  const hasAuction = !!currentAuction;
+  const allDone = hasData && hasSeasons && hasAuction;
+  if (allDone) {
+    document.getElementById('view-welcome').style.display = 'none';
+    return;
+  }
+  document.getElementById('view-welcome').style.display = '';
+  el.innerHTML = `
+    <h1>FantaWizard</h1>
+    <div class="welcome-sub">Il tuo assistente per l'asta del fantacalcio.<br>Segui questi passi per iniziare.</div>
+    <div class="welcome-steps">
+      <div class="welcome-step ${hasAuction?'done':''}" onclick="${hasAuction?'':'navigateTo(\\'setup\\')'}" style="${hasAuction?'':'cursor:pointer;'}">
+        <div class="welcome-step-num">${hasAuction?'&#10003;':'1'}</div>
+        <div class="welcome-step-text"><strong>Crea la tua asta</strong><span>Configura squadre, crediti, bonus e moduli</span></div>
+      </div>
+      <div class="welcome-step ${hasData?'done':''}" onclick="${hasData?'':hasAuction?'navigateTo(\\'data\\')':''}" style="${!hasData&&hasAuction?'cursor:pointer;':''}">
+        <div class="welcome-step-num">${hasData?'&#10003;':'2'}</div>
+        <div class="welcome-step-text"><strong>Importa le quotazioni</strong><span>Carica il listone da Fantacalcio.it o Fantagazzetta</span></div>
+      </div>
+      <div class="welcome-step ${hasSeasons?'done':''}" onclick="${hasSeasons?'':hasAuction?'navigateTo(\\'data\\')':''}" style="${!hasSeasons&&hasAuction?'cursor:pointer;':''}">
+        <div class="welcome-step-num">${hasSeasons?'&#10003;':'3'}</div>
+        <div class="welcome-step-text"><strong>Importa le statistiche</strong><span>Almeno una stagione per le proiezioni FMA</span></div>
+      </div>
+    </div>
+    ${!hasAuction?'<button class="btn" onclick="navigateTo(\'setup\')" style="padding:12px 36px;font-size:1rem;">Inizia Setup</button>':''}
+    ${hasAuction&&!hasData?'<button class="btn" onclick="navigateTo(\'data\')" style="padding:12px 36px;font-size:1rem;">Importa dati</button>':''}
+  `;
+}
+
+function checkFirstRun() {
+  const hasData = allPlayers.length > 0;
+  const hasAuction = !!currentAuction;
+  if (!hasData && !hasAuction) {
+    renderWelcome();
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-welcome').classList.add('active');
+    document.getElementById('topbar-title').textContent = 'Benvenuto';
+    document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+  }
+}
+
 // ── Init ──
 renderSetup();
 loadExistingAuctions();
-loadAllData();
-updateNavState();
+(async () => {
+  showLoading('Caricamento dati...');
+  try {
+    await loadAllData();
+  } finally { hideLoading(); }
+  updateNavState();
+  renderWelcome();
+  checkFirstRun();
+})();
 </script>
 </body>
 </html>
