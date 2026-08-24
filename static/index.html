@@ -2346,6 +2346,12 @@ function autoFillPlan() {
       pickedIds.add(s.playerId);
       starterSpent += maxPrice;
     }
+    for (const s of byFma) {
+      if (targetList[role].length >= nStarters) break;
+      if (pickedIds.has(s.playerId)) continue;
+      targetList[role].push({playerId: s.playerId, maxPrice: Math.max(1, s.rec), starter: true});
+      pickedIds.add(s.playerId);
+    }
 
     let benchSpent = 0;
     const byValue = [...scored].filter(s => !pickedIds.has(s.playerId)).sort((a,b) => b.value - a.value);
@@ -2359,6 +2365,12 @@ function autoFillPlan() {
       targetList[role].push({playerId: s.playerId, maxPrice, starter: false});
       pickedIds.add(s.playerId);
       benchSpent += maxPrice;
+    }
+    for (const s of byValue) {
+      if (targetList[role].length >= count) break;
+      if (pickedIds.has(s.playerId)) continue;
+      targetList[role].push({playerId: s.playerId, maxPrice: 1, starter: false});
+      pickedIds.add(s.playerId);
     }
   }
   savePlan();
