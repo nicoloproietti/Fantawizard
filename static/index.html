@@ -309,6 +309,12 @@ a { color: var(--accent2); text-decoration: none; }
 .sr-item .price-tag.t2 { background: #26c6da; color:#000; }
 .sr-item .price-tag.t3 { background: var(--yellow); color:#000; }
 .sr-item .price-tag.t4 { background: var(--text3); color:#ddd; }
+.status-badge { display:inline-block; font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:4px; letter-spacing:.02em; }
+.status-tit { background:var(--green); color:#000; }
+.status-semi { background:#26c6da; color:#000; }
+.status-rot { background:var(--yellow); color:#000; }
+.status-ris { background:var(--text3); color:#ddd; }
+.status-nd { background:var(--bg3); color:var(--text3); }
 .sr-item.sold { opacity:.3; }
 .sr-item .rec-price {
   font-weight: 800;
@@ -1070,13 +1076,22 @@ function computeReliability(lastSeasonApps, sortedApps) {
   return 0.3 + pctile * 1.4;
 }
 
+function getPlayerStatus(lastApps, maxApps) {
+  if (maxApps < 1) return {label:'N/D', cls:'status-nd'};
+  const ratio = lastApps / maxApps;
+  if (ratio >= 0.75) return {label:'Titolare', cls:'status-tit'};
+  if (ratio >= 0.40) return {label:'Semi-tit.', cls:'status-semi'};
+  if (ratio >= 0.13) return {label:'Rotazione', cls:'status-rot'};
+  return {label:'Riserva', cls:'status-ris'};
+}
+
 function estimateStarterRole(player, teamRolePlayers) {
-  if (!teamRolePlayers.length) return 0.3;
+  if (!teamRolePlayers.length) return {reliability: 0.3, status: {label:'Prob. riserva', cls:'status-ris'}};
   const sorted = [...teamRolePlayers].sort((a,b) => (b.initial_price||0) - (a.initial_price||0));
   const rank = sorted.findIndex(p => p.id === player.id);
-  if (rank === 0) return 0.85;
-  if (rank === 1) return 0.55;
-  return 0.3;
+  if (rank === 0) return {reliability: 0.85, status: {label:'Prob. titolare', cls:'status-tit'}};
+  if (rank === 1) return {reliability: 0.55, status: {label:'Prob. semi-tit.', cls:'status-semi'}};
+  return {reliability: 0.3, status: {label:'Prob. riserva', cls:'status-ris'}};
 }
 
 function computeTiers(players, seasonMap) {
@@ -1095,14 +1110,18 @@ function computeTiers(players, seasonMap) {
   const result = {};
   for (const [role, items] of Object.entries(byRole)) {
     const sortedApps = items.map(p => p.lastApps).sort((a,b) => b - a);
+    const maxApps = sortedApps[0] || 0;
     for (const p of items) {
       const baseRel = computeReliability(p.lastApps, sortedApps);
       if (baseRel === 0) {
         const trKey = `${p.team}_${p.role_classic}`;
-        p.reliability = estimateStarterRole(p, byTeamRole[trKey] || []);
+        const est = estimateStarterRole(p, byTeamRole[trKey] || []);
+        p.reliability = est.reliability;
+        p.status = est.status;
         p.projected = true;
       } else {
         p.reliability = baseRel;
+        p.status = getPlayerStatus(p.lastApps, maxApps);
         p.projected = false;
       }
       p.adjFma = Math.round(p.fma * p.reliability * 100) / 100;
@@ -1300,6 +1319,7 @@ async function callPlayer(playerId) {
   const adjFma = ptd ? ptd.adjFma : projectFMA(pl, seasonMap[pl.id]||[]);
   const reliability = ptd ? ptd.reliability : 1;
   const isProjected = ptd ? !!ptd.projected : false;
+  const playerStatus = ptd ? ptd.status : {label:'N/D', cls:'status-nd'};
   const relPct = Math.round(reliability * 100);
 
   let infl = {}, mb = 999, purch = [];
@@ -1337,7 +1357,7 @@ async function callPlayer(playerId) {
   panel.innerHTML = `
     <div class="call-header">
       <div>
-        <h2>${pl.name} <span class="call-role price-tag ${tierCls}">F${tier} · ${pl.role_classic}</span></h2>
+        <h2>${pl.name} <span class="call-role price-tag ${tierCls}">F${tier} · ${pl.role_classic}</span> <span class="status-badge ${playerStatus.cls}">${playerStatus.label}</span></h2>
         <div style="color:var(--text2);font-size:.82rem;margin-top:2px;">${pl.team} ${pl.is_penalty_taker?'· &#9917; Rigorista':''} · ${isProjected?'Affid. stimata':'Affid.'} <span style="color:${relClr};font-weight:700;">${relPct}%</span>${roleNeed.remaining>0?' · <span style="color:var(--yellow);font-weight:600;">Ti serve questo ruolo ('+roleNeed.remaining+' slot)</span>':''}</div>
       </div>
       <button class="call-close" onclick="closeCallPanel()">&#x2715;</button>
@@ -2252,6 +2272,7 @@ async function openPlayer(id) {
   const plTier = tierList.find(tp => tp.id === pl.id);
   reliability = plTier ? plTier.reliability : 1;
   isProjected = plTier ? !!plTier.projected : false;
+  const playerStatus = plTier ? plTier.status : {label:'N/D', cls:'status-nd'};
   adjFma = plTier ? plTier.adjFma : fma;
 
   if (currentAuction) {
@@ -2323,7 +2344,7 @@ async function openPlayer(id) {
   document.getElementById('modal-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:start;">
       <div>
-        <h2>${pl.name} <span class="price-tag t${tier}" style="font-size:.75rem;vertical-align:middle;margin-left:8px;">F${tier}</span></h2>
+        <h2>${pl.name} <span class="price-tag t${tier}" style="font-size:.75rem;vertical-align:middle;margin-left:8px;">F${tier}</span> <span class="status-badge ${playerStatus.cls}" style="font-size:.68rem;vertical-align:middle;margin-left:4px;">${playerStatus.label}</span></h2>
         <div class="subtitle">${pl.role_classic}${pl.role_mantra?' · '+pl.role_mantra:''} · ${pl.team} ${pl.is_penalty_taker?'· Rigorista':''}</div>
       </div>
       <button onclick="document.getElementById('player-modal').classList.remove('open')" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;font-family:var(--font);">&#x2715;</button>
@@ -2496,8 +2517,9 @@ function showTierRole(role) {
       ${players.map(p => {
         const relPct = Math.round(p.reliability * 100);
         const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
+        const st = p.status || {label:'N/D', cls:'status-nd'};
         return `<div class="tier-player ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
-        <span>${p.name} <span style="color:var(--text2);font-size:.75rem;">${p.team}</span></span>
+        <span>${p.name} <span style="color:var(--text2);font-size:.75rem;">${p.team}</span> <span class="status-badge ${st.cls}">${st.label}</span></span>
         <span style="display:flex;gap:8px;align-items:center;">
           <span title="${p.projected?'Affid. stimata':'Affidabilità'} ${relPct}% (pres. ${Math.round(p.lastApps||0)})" style="font-size:.65rem;color:${relClr};font-weight:600;">${relPct}%${p.projected?'*':''}</span>
           <span class="fma">${p.adjFma}</span>
@@ -2630,6 +2652,7 @@ const DB_COLS = [
   {key:'role_classic', label:'R', cls:''},
   {key:'fma', label:'FMA', cls:'num-col', num:true},
   {key:'reliability', label:'Affid.', cls:'num-col', num:true},
+  {key:'statusLabel', label:'Status', cls:''},
   {key:'adjFma', label:'FMA adj', cls:'num-col', num:true},
   {key:'rec', label:'Consigliato', cls:'num-col', num:true},
   {key:'mkt', label:'Media aste', cls:'num-col', num:true},
@@ -2659,6 +2682,7 @@ function renderPlayersDB() {
     const plTier = tierList.find(tp => tp.id === pl.id);
     const reliability = plTier ? plTier.reliability : 1;
     const projected = plTier ? !!plTier.projected : false;
+    const status = plTier ? plTier.status : {label:'N/D', cls:'status-nd'};
     const adjFma = plTier ? plTier.adjFma : fma;
     const bp = basePrice(adjFma, pl.role_classic, credits, numTeams, totalSlots);
     const scarcity = computeScarcity(tier, roleTiers);
@@ -2668,6 +2692,7 @@ function renderPlayersDB() {
     return {
       id:pl.id, name:pl.name, team:pl.team, role_classic:pl.role_classic,
       fma, reliability: Math.round(reliability * 100), projected, adjFma, rec, mkt: mkt||0,
+      statusLabel: status.label, statusCls: status.cls,
       initial_price:pl.initial_price||0,
       avg_rating: s0.avg_rating||0, fanta_avg: s0.fanta_avg||0,
       appearances: s0.appearances||0, goals: s0.goals||0, assists: s0.assists||0,
@@ -2710,6 +2735,7 @@ function renderPlayersDB() {
       <td><span class="price-tag ${tierCls}" style="font-size:.7rem;padding:2px 8px;">${r.role_classic}</span></td>
       <td class="num-col" style="font-weight:700;color:var(--accent);">${r.fma}</td>
       <td class="num-col" style="font-weight:600;color:${relClr};" title="${r.projected?'Stimata da quotazione':'Basata su presenze'}">${r.reliability}%${r.projected?'*':''}</td>
+      <td><span class="status-badge ${r.statusCls}">${r.statusLabel}</span></td>
       <td class="num-col" style="font-weight:700;color:var(--accent);">${r.adjFma}</td>
       <td class="num-col" style="font-weight:700;color:var(--green);">${r.rec}</td>
       <td class="num-col" style="color:#26c6da;">${r.mkt||'-'}</td>
