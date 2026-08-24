@@ -1067,24 +1067,36 @@ function weightedStat(seasons, attr) {
   return vals.reduce((acc, v, i) => acc + v * w[i], 0) / tw;
 }
 
+function bonusPerMatchBySeason(seasons) {
+  return seasons.map(s => {
+    const app = s.appearances || 0;
+    if (app < 1) return 0;
+    let bonus = 0;
+    for (const [stat, code] of Object.entries(STAT_TO_BONUS)) {
+      const bval = bonusMap[code] || 0;
+      if (bval === 0) continue;
+      let count;
+      if (stat === 'penalties_missed') {
+        count = (s.penalties_taken || 0) - (s.penalties_scored || 0);
+      } else {
+        count = s[stat] || 0;
+      }
+      bonus += (count / app) * bval;
+    }
+    return bonus;
+  });
+}
+
 function projectFMA(player, seasons) {
   if (!seasons.length) return 0;
   const avgRating = weightedStat(seasons, 'avg_rating');
   const appearances = weightedStat(seasons, 'appearances');
   if (appearances < 1) return 0;
 
-  let bonusTotal = 0;
-  for (const [stat, code] of Object.entries(STAT_TO_BONUS)) {
-    const bval = bonusMap[code] || 0;
-    if (bval === 0) continue;
-    let count;
-    if (stat === 'penalties_missed') {
-      count = weightedStat(seasons, 'penalties_taken') - weightedStat(seasons, 'penalties_scored');
-    } else {
-      count = weightedStat(seasons, stat);
-    }
-    bonusTotal += (count * bval) / (appearances || 1);
-  }
+  const perSeasonBonus = bonusPerMatchBySeason(seasons);
+  const w = SEASON_WEIGHTS.slice(0, perSeasonBonus.length);
+  const tw = w.reduce((a,b) => a+b, 0);
+  const bonusTotal = perSeasonBonus.reduce((acc, v, i) => acc + v * w[i], 0) / tw;
 
   let fma = avgRating + bonusTotal;
   if (modFlags['MOD_DIFESA'] && (player.role_classic === 'P' || player.role_classic === 'D')) {
@@ -1098,20 +1110,25 @@ function projectFMA(player, seasons) {
 
 function computeBonusPerMatch(seasons) {
   if (!seasons.length) return [];
-  const appearances = weightedStat(seasons, 'appearances');
-  if (appearances < 1) return [];
+  const validSeasons = seasons.filter(s => (s.appearances || 0) >= 1);
+  if (!validSeasons.length) return [];
+  const w = SEASON_WEIGHTS.slice(0, validSeasons.length);
+  const tw = w.reduce((a,b) => a+b, 0);
   const items = [];
   for (const [stat, code] of Object.entries(STAT_TO_BONUS)) {
     const bdef = BONUS_DEFAULTS.find(b => b.code === code);
     if (!bdef) continue;
     const bval = bonusMap[code] || bdef.value;
-    let count;
-    if (stat === 'penalties_missed') {
-      count = weightedStat(seasons, 'penalties_taken') - weightedStat(seasons, 'penalties_scored');
-    } else {
-      count = weightedStat(seasons, stat);
-    }
-    const perMatch = count / appearances;
+    const perMatchBySeason = validSeasons.map(s => {
+      let count;
+      if (stat === 'penalties_missed') {
+        count = (s.penalties_taken || 0) - (s.penalties_scored || 0);
+      } else {
+        count = s[stat] || 0;
+      }
+      return count / s.appearances;
+    });
+    const perMatch = perMatchBySeason.reduce((acc, v, i) => acc + v * w[i], 0) / tw;
     if (perMatch < 0.005 && perMatch > -0.005) continue;
     const impact = perMatch * bval;
     items.push({label: bdef.label, perMatch: Math.round(perMatch * 100) / 100, bval, impact: Math.round(impact * 100) / 100});
