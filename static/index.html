@@ -622,6 +622,32 @@ a { color: var(--accent2); text-decoration: none; }
 .suggest-card { background:var(--accent-dim); border:1px solid var(--accent); border-radius:var(--radius); padding:14px; margin-top:12px; }
 .suggest-card h3 { font-family:var(--font-display); font-size:.95rem; font-weight:400; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
 
+/* ── Analytics Widgets ── */
+.analytics-section { margin-top:24px; }
+.analytics-section h2 { font-family:var(--font-display); font-size:1.2rem; font-weight:400; text-transform:uppercase; letter-spacing:.06em; color:var(--text2); margin-bottom:14px; }
+.analytics-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media(max-width:900px){ .analytics-grid{grid-template-columns:1fr;} }
+.analytics-widget { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+.analytics-widget h3 { font-family:var(--font-display); font-size:.95rem; font-weight:400; color:var(--text2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; }
+.analytics-widget svg { display:block; width:100%; }
+.aw-bar-label { font-size:.68rem; fill:var(--text2); }
+.aw-bar-value { font-size:.62rem; fill:var(--text); font-weight:700; }
+.aw-axis { stroke:var(--border2); stroke-width:1; }
+.aw-legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.aw-legend-item { display:flex; align-items:center; gap:4px; font-size:.68rem; color:var(--text2); }
+.aw-legend-swatch { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+.aw-team-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s; }
+.aw-team-row:last-child { border-bottom:none; }
+.aw-team-row:hover { background:var(--bg3); }
+.aw-team-name { font-weight:600; font-size:.84rem; }
+.aw-team-count { font-size:.75rem; color:var(--text3); }
+.aw-team-detail { display:none; padding:8px 0 12px; }
+.aw-team-detail.open { display:block; }
+.aw-team-detail table { width:100%; }
+.aw-team-detail td { padding:3px 6px; font-size:.78rem; border-bottom:1px solid var(--border); }
+.aw-team-detail td:first-child { font-weight:600; }
+.aw-heatmap-cell { display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:700; border-radius:3px; min-height:32px; }
+
 /* ── Plan View ── */
 .plan-role-section { margin-bottom:24px; }
 .plan-role-header {
@@ -859,6 +885,19 @@ a { color: var(--accent2); text-decoration: none; }
       </div>
     </div>
   </div>
+
+  <!-- Analytics Widgets -->
+  <div class="analytics-section" id="analytics-section" style="display:none;">
+    <h2>Analytics</h2>
+    <div class="analytics-grid">
+      <div class="analytics-widget" id="aw-credits"></div>
+      <div class="analytics-widget" id="aw-role-spend"></div>
+      <div class="analytics-widget" id="aw-inflation"></div>
+      <div class="analytics-widget" id="aw-tiers"></div>
+      <div class="analytics-widget" id="aw-slots"></div>
+      <div class="analytics-widget" id="aw-team-players"></div>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -1023,6 +1062,7 @@ function closeAuction() {
   modFlags = {};
   rosterSlots = {};
   document.getElementById('strategy-section').style.display = 'none';
+  document.getElementById('analytics-section').style.display = 'none';
   updateNavState();
   toast('Asta chiusa');
 }
@@ -1663,6 +1703,262 @@ function renderSuggestion(allPurch, opponents, needs) {
     suggestText.innerHTML = `<div style="font-size:.82rem;line-height:1.5;">${tip}</div>`;
     suggestEl.style.display = '';
   } else { suggestEl.style.display = 'none'; }
+}
+
+// ── Analytics Widgets ──
+const ROLE_COLORS = {P:'#9b59b6', D:'#2fc5ee', C:'#2ecc71', A:'#e74c3c'};
+const ROLE_ORDER = ['P','D','C','A'];
+
+async function renderAnalytics() {
+  if (!currentAuction) { document.getElementById('analytics-section').style.display='none'; return; }
+  document.getElementById('analytics-section').style.display='';
+  const {data: purch} = await sb.from('purchases').select('*, players(name,team,role_classic)').eq('auction_id', currentAuction).order('created_at');
+  const allPurch = purch || [];
+  if (!allPurch.length) {
+    document.getElementById('analytics-section').style.display='none';
+    return;
+  }
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  renderCreditsChart(allPurch);
+  renderRoleSpendChart(allPurch);
+  renderInflationChart(allPurch, seasonMap);
+  renderTierChart(allPurch, tierData);
+  renderSlotsMatrix(allPurch);
+  renderTeamPlayers(allPurch);
+}
+
+function renderCreditsChart(allPurch) {
+  const el = document.getElementById('aw-credits');
+  const credits = auctionData.initial_credits;
+  const teamSpend = {};
+  for (const t of teamsCache) teamSpend[t.id] = {name:t.name, spent:0, isUser:t.is_user};
+  for (const p of allPurch) { if (teamSpend[p.team_id]) teamSpend[p.team_id].spent += p.price; }
+  const teams = Object.values(teamSpend).sort((a,b) => b.spent - a.spent);
+  const barH = 22, gap = 6, padL = 80, padR = 50, padT = 24, w = 400;
+  const h = padT + teams.length * (barH + gap) + 10;
+  let svg = `<h3>Crediti spesi / rimanenti</h3><svg viewBox="0 0 ${w} ${h}">`;
+  teams.forEach((t, i) => {
+    const y = padT + i * (barH + gap);
+    const pctSpent = t.spent / credits;
+    const barW = (w - padL - padR) * Math.min(pctSpent, 1);
+    const remaining = credits - t.spent;
+    const clr = t.isUser ? 'var(--accent)' : (pctSpent > 0.85 ? 'var(--red)' : pctSpent > 0.6 ? 'var(--yellow)' : 'var(--green)');
+    svg += `<text x="${padL-4}" y="${y+barH/2+4}" text-anchor="end" class="aw-bar-label" style="${t.isUser?'fill:var(--accent);font-weight:700;':''}">${t.name}</text>`;
+    svg += `<rect x="${padL}" y="${y}" width="${w-padL-padR}" height="${barH}" rx="3" fill="var(--bg3)"/>`;
+    svg += `<rect x="${padL}" y="${y}" width="${Math.max(barW,2)}" height="${barH}" rx="3" fill="${clr}" opacity=".85"/>`;
+    svg += `<text x="${padL + barW + 4}" y="${y+barH/2+4}" class="aw-bar-value">${t.spent} / ${remaining}</text>`;
+  });
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function renderRoleSpendChart(allPurch) {
+  const el = document.getElementById('aw-role-spend');
+  const teamRole = {};
+  for (const t of teamsCache) { teamRole[t.id] = {name:t.name, isUser:t.is_user}; for (const r of ROLE_ORDER) teamRole[t.id][r] = 0; }
+  for (const p of allPurch) {
+    const role = p.players?.role_classic;
+    if (role && teamRole[p.team_id]) teamRole[p.team_id][role] += p.price;
+  }
+  const teams = Object.values(teamRole).sort((a,b) => {
+    const sa = ROLE_ORDER.reduce((s,r)=>s+a[r],0), sb2 = ROLE_ORDER.reduce((s,r)=>s+b[r],0);
+    return sb2 - sa;
+  });
+  const maxSpend = Math.max(...teams.map(t => ROLE_ORDER.reduce((s,r)=>s+t[r],0)), 1);
+  const barH = 22, gap = 6, padL = 80, padR = 16, padT = 24, w = 400;
+  const h = padT + teams.length * (barH + gap) + 30;
+  let svg = `<h3>Spesa per ruolo</h3><svg viewBox="0 0 ${w} ${h}">`;
+  teams.forEach((t, i) => {
+    const y = padT + i * (barH + gap);
+    let x = padL;
+    svg += `<text x="${padL-4}" y="${y+barH/2+4}" text-anchor="end" class="aw-bar-label" style="${t.isUser?'fill:var(--accent);font-weight:700;':''}">${t.name}</text>`;
+    svg += `<rect x="${padL}" y="${y}" width="${w-padL-padR}" height="${barH}" rx="3" fill="var(--bg3)"/>`;
+    for (const r of ROLE_ORDER) {
+      const segW = (t[r] / maxSpend) * (w - padL - padR);
+      if (segW > 0) {
+        svg += `<rect x="${x}" y="${y}" width="${segW}" height="${barH}" ${x===padL?'rx="3"':''} fill="${ROLE_COLORS[r]}" opacity=".8"/>`;
+        if (segW > 18) svg += `<text x="${x+segW/2}" y="${y+barH/2+4}" text-anchor="middle" style="font-size:.55rem;fill:#fff;font-weight:600;">${t[r]}</text>`;
+        x += segW;
+      }
+    }
+  });
+  svg += '</svg>';
+  let legend = '<div class="aw-legend">';
+  for (const r of ROLE_ORDER) legend += `<span class="aw-legend-item"><span class="aw-legend-swatch" style="background:${ROLE_COLORS[r]}"></span>${r}</span>`;
+  legend += '</div>';
+  el.innerHTML = svg + legend;
+}
+
+function renderInflationChart(allPurch, seasonMap) {
+  const el = document.getElementById('aw-inflation');
+  const playerMap = {};
+  for (const pl of allPlayers) playerMap[pl.id] = pl;
+  const sorted = [...allPurch].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  const window = 5;
+  const roleData = {};
+  for (const r of ROLE_ORDER) roleData[r] = [];
+  const roleBuf = {};
+  for (const r of ROLE_ORDER) roleBuf[r] = [];
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0);
+  sorted.forEach((p, idx) => {
+    const pl = playerMap[p.player_id];
+    if (!pl) return;
+    const ss = seasonMap[pl.id] || [];
+    const fma = projectFMA(pl, ss);
+    const bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
+    const ratio = bp > 0 ? p.price / bp : 1;
+    if (roleBuf[pl.role_classic]) {
+      roleBuf[pl.role_classic].push(ratio);
+      if (roleBuf[pl.role_classic].length > window) roleBuf[pl.role_classic].shift();
+      const avg = roleBuf[pl.role_classic].reduce((a,b)=>a+b,0) / roleBuf[pl.role_classic].length;
+      roleData[pl.role_classic].push({idx, val: avg});
+    }
+  });
+  const padL = 36, padR = 10, padT = 24, padB = 20, w = 400, h = 180;
+  const chartW = w - padL - padR, chartH = h - padT - padB;
+  const maxIdx = sorted.length;
+  let allVals = [];
+  for (const r of ROLE_ORDER) allVals = allVals.concat(roleData[r].map(d => d.val));
+  if (!allVals.length) { el.innerHTML = '<h3>Andamento inflazione</h3><div style="color:var(--text3);font-size:.82rem;padding:20px 0;">Dati insufficienti</div>'; return; }
+  const minV = Math.min(...allVals, 0.5), maxV = Math.max(...allVals, 1.5);
+  const scaleX = idx => padL + (idx / Math.max(maxIdx - 1, 1)) * chartW;
+  const scaleY = v => padT + chartH - ((v - minV) / (maxV - minV)) * chartH;
+  let svg = `<h3>Andamento inflazione per ruolo</h3><svg viewBox="0 0 ${w} ${h}">`;
+  svg += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+chartH}" class="aw-axis"/>`;
+  svg += `<line x1="${padL}" y1="${padT+chartH}" x2="${padL+chartW}" y2="${padT+chartH}" class="aw-axis"/>`;
+  const baseY = scaleY(1);
+  svg += `<line x1="${padL}" y1="${baseY}" x2="${padL+chartW}" y2="${baseY}" stroke="var(--text3)" stroke-width=".5" stroke-dasharray="3,3"/>`;
+  svg += `<text x="${padL-4}" y="${baseY+3}" text-anchor="end" style="font-size:.55rem;fill:var(--text3);">1.0x</text>`;
+  for (const r of ROLE_ORDER) {
+    const pts = roleData[r];
+    if (pts.length < 2) continue;
+    const d = pts.map((p,i) => `${i===0?'M':'L'}${scaleX(p.idx).toFixed(1)},${scaleY(p.val).toFixed(1)}`).join(' ');
+    svg += `<path d="${d}" fill="none" stroke="${ROLE_COLORS[r]}" stroke-width="2" opacity=".9"/>`;
+  }
+  svg += `<text x="${padL+chartW/2}" y="${h-2}" text-anchor="middle" style="font-size:.55rem;fill:var(--text3);">Acquisti (cronologico)</text>`;
+  svg += '</svg>';
+  let legend = '<div class="aw-legend">';
+  for (const r of ROLE_ORDER) legend += `<span class="aw-legend-item"><span class="aw-legend-swatch" style="background:${ROLE_COLORS[r]}"></span>${r}</span>`;
+  legend += '</div>';
+  el.innerHTML = svg + legend;
+}
+
+function renderTierChart(allPurch, tierData) {
+  const el = document.getElementById('aw-tiers');
+  const teamTiers = {};
+  for (const t of teamsCache) { teamTiers[t.id] = {name:t.name, isUser:t.is_user, 1:0, 2:0, 3:0, 4:0}; }
+  for (const p of allPurch) {
+    const role = p.players?.role_classic;
+    if (!role || !teamTiers[p.team_id]) continue;
+    const tier = getPlayerTier(p.player_id, role, tierData);
+    teamTiers[p.team_id][tier]++;
+  }
+  const teams = Object.values(teamTiers).sort((a,b) => (b[1]+b[2]) - (a[1]+a[2]));
+  const maxCount = Math.max(...teams.map(t => t[1]+t[2]+t[3]+t[4]), 1);
+  const tierColors = {1:'var(--green)', 2:'var(--accent)', 3:'var(--yellow)', 4:'var(--text3)'};
+  const tierLabels = {1:'F1 Top', 2:'F2 Solidi', 3:'F3 Rotazione', 4:'F4 Panchinari'};
+  const barH = 22, gap = 6, padL = 80, padR = 16, padT = 24, w = 400;
+  const h = padT + teams.length * (barH + gap) + 30;
+  let svg = `<h3>Tier acquistati per squadra</h3><svg viewBox="0 0 ${w} ${h}">`;
+  teams.forEach((t, i) => {
+    const y = padT + i * (barH + gap);
+    let x = padL;
+    svg += `<text x="${padL-4}" y="${y+barH/2+4}" text-anchor="end" class="aw-bar-label" style="${t.isUser?'fill:var(--accent);font-weight:700;':''}">${t.name}</text>`;
+    svg += `<rect x="${padL}" y="${y}" width="${w-padL-padR}" height="${barH}" rx="3" fill="var(--bg3)"/>`;
+    for (let tier = 1; tier <= 4; tier++) {
+      const segW = (t[tier] / maxCount) * (w - padL - padR);
+      if (segW > 0) {
+        svg += `<rect x="${x}" y="${y}" width="${segW}" height="${barH}" ${x===padL?'rx="3"':''} fill="${tierColors[tier]}" opacity=".8"/>`;
+        if (segW > 14) svg += `<text x="${x+segW/2}" y="${y+barH/2+4}" text-anchor="middle" style="font-size:.55rem;fill:#fff;font-weight:600;">${t[tier]}</text>`;
+        x += segW;
+      }
+    }
+  });
+  svg += '</svg>';
+  let legend = '<div class="aw-legend">';
+  for (let t = 1; t <= 4; t++) legend += `<span class="aw-legend-item"><span class="aw-legend-swatch" style="background:${tierColors[t]}"></span>${tierLabels[t]}</span>`;
+  legend += '</div>';
+  el.innerHTML = svg + legend;
+}
+
+function renderSlotsMatrix(allPurch) {
+  const el = document.getElementById('aw-slots');
+  const teamSlots = {};
+  for (const t of teamsCache) {
+    teamSlots[t.id] = {name:t.name, isUser:t.is_user};
+    for (const r of ROLE_ORDER) teamSlots[t.id][r] = 0;
+  }
+  for (const p of allPurch) {
+    const role = p.players?.role_classic;
+    if (role && teamSlots[p.team_id]) teamSlots[p.team_id][role]++;
+  }
+  const teams = Object.values(teamSlots);
+  let html = '<h3>Slot rimanenti per ruolo</h3>';
+  html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.78rem;">';
+  html += '<thead><tr><th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);"></th>';
+  for (const r of ROLE_ORDER) html += `<th style="text-align:center;padding:6px 8px;color:${ROLE_COLORS[r]};font-weight:700;border-bottom:1px solid var(--border2);">${r}</th>`;
+  html += '<th style="text-align:center;padding:6px 8px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);">Tot</th></tr></thead><tbody>';
+  for (const t of teams) {
+    const isU = t.isUser;
+    html += `<tr style="${isU?'background:var(--accent-dim);':''}">`;
+    html += `<td style="padding:6px 8px;font-weight:${isU?'700':'500'};color:${isU?'var(--accent)':'var(--text)'};border-bottom:1px solid var(--border);">${t.name}</td>`;
+    let totalLeft = 0;
+    for (const r of ROLE_ORDER) {
+      const need = rosterSlots[r] || 0;
+      const have = t[r];
+      const left = need - have;
+      totalLeft += Math.max(left, 0);
+      const bg = left <= 0 ? 'rgba(46,204,113,.15)' : left <= 1 ? 'rgba(241,196,15,.12)' : 'rgba(231,76,60,.1)';
+      const clr = left <= 0 ? 'var(--green)' : left <= 1 ? 'var(--yellow)' : 'var(--red)';
+      html += `<td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);"><span class="aw-heatmap-cell" style="background:${bg};color:${clr};width:100%;display:inline-flex;">${left <= 0 ? '&#10003;' : left}</span></td>`;
+    }
+    const totBg = totalLeft <= 0 ? 'rgba(46,204,113,.15)' : totalLeft <= 3 ? 'rgba(241,196,15,.12)' : 'rgba(231,76,60,.1)';
+    const totClr = totalLeft <= 0 ? 'var(--green)' : totalLeft <= 3 ? 'var(--yellow)' : 'var(--red)';
+    html += `<td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);"><span class="aw-heatmap-cell" style="background:${totBg};color:${totClr};width:100%;display:inline-flex;">${totalLeft <= 0 ? '&#10003;' : totalLeft}</span></td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function renderTeamPlayers(allPurch) {
+  const el = document.getElementById('aw-team-players');
+  const teamPurch = {};
+  for (const t of teamsCache) teamPurch[t.id] = {name:t.name, isUser:t.is_user, players:[], spent:0};
+  for (const p of allPurch) {
+    if (teamPurch[p.team_id]) {
+      teamPurch[p.team_id].players.push(p);
+      teamPurch[p.team_id].spent += p.price;
+    }
+  }
+  const teams = Object.values(teamPurch).sort((a,b) => b.spent - a.spent);
+  let html = '<h3>Giocatori per squadra</h3>';
+  for (const t of teams) {
+    const uid = 'awtp-' + t.name.replace(/\s/g,'_');
+    html += `<div>
+      <div class="aw-team-row" onclick="document.getElementById('${uid}').classList.toggle('open')">
+        <span class="aw-team-name" style="${t.isUser?'color:var(--accent);':''}">${t.name}</span>
+        <span><span style="font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent);">${t.spent}</span> <span class="aw-team-count">(${t.players.length} acq.)</span></span>
+      </div>
+      <div class="aw-team-detail" id="${uid}">`;
+    if (t.players.length) {
+      html += '<table><tbody>';
+      for (const p of t.players) {
+        html += `<tr style="cursor:pointer;" onclick="openPlayer(${p.player_id})">
+          <td style="color:${ROLE_COLORS[p.players?.role_classic]||'var(--text)'};">${p.players?.role_classic||'?'}</td>
+          <td>${p.players?.name||'?'}</td>
+          <td style="color:var(--text2);">${p.players?.team||''}</td>
+          <td style="font-weight:700;text-align:right;font-variant-numeric:tabular-nums;">${p.price}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+    } else {
+      html += '<div style="color:var(--text3);font-size:.78rem;padding:4px 0;">Nessun acquisto</div>';
+    }
+    html += '</div></div>';
+  }
+  el.innerHTML = html;
 }
 
 // ── Target Planning ──
@@ -2712,6 +3008,7 @@ async function refreshDashboard() {
   refreshPurchases();
   refreshBudget();
   refreshStrategyPanel();
+  renderAnalytics();
 }
 
 async function refreshPurchases() {
