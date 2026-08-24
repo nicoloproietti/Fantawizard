@@ -1066,15 +1066,11 @@ function computeInflation(purchases, playerMap, seasonMap) {
   return inflation;
 }
 
-function computeReliability(lastSeasonApps, sortedApps) {
-  const active = sortedApps.filter(a => a > 0);
-  const n = active.length;
-  if (n === 0 || lastSeasonApps < 1) return 0;
-  let rank = active.findIndex(a => lastSeasonApps >= a);
-  if (rank === -1) rank = n;
-  const pctile = 1 - rank / n;
-  if (pctile >= 0.5) return 1.0;
-  return 0.3 + pctile * 1.4;
+function computeReliability(lastSeasonApps, maxApps) {
+  if (maxApps < 1 || lastSeasonApps < 1) return 0;
+  const ratio = lastSeasonApps / maxApps;
+  if (ratio >= 0.75) return 1.0;
+  return Math.min(1.0, 0.3 + (ratio / 0.75) * 0.7);
 }
 
 function getPlayerStatus(lastApps, maxApps) {
@@ -1110,10 +1106,9 @@ function computeTiers(players, seasonMap) {
   }
   const result = {};
   for (const [role, items] of Object.entries(byRole)) {
-    const sortedApps = items.map(p => p.lastApps).sort((a,b) => b - a);
-    const maxApps = sortedApps[0] || 0;
+    const maxApps = Math.max(...items.map(p => p.lastApps), 0);
     for (const p of items) {
-      const baseRel = computeReliability(p.lastApps, sortedApps);
+      const baseRel = computeReliability(p.lastApps, maxApps);
       if (baseRel === 0) {
         const trKey = `${p.team}_${p.role_classic}`;
         const est = estimateStarterRole(p, byTeamRole[trKey] || []);
