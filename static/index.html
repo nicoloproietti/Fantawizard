@@ -1325,7 +1325,7 @@ function basePrice(fma, role, initialCredits, numTeams, totalSlots) {
   const pool = initialCredits * numTeams;
   const perSlot = pool / Math.max(totalSlots * numTeams, 1);
   const rw = {P:0.6, D:0.8, C:1.0, A:1.3}[role] || 1;
-  const raw = Math.pow(fma - 4.5, 1.8) * rw * perSlot * 0.35;
+  const raw = Math.pow(Math.max(0, fma - 4.5), 1.8) * rw * perSlot * 0.35;
   return Math.max(1, Math.round(raw));
 }
 
