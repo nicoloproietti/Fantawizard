@@ -1103,9 +1103,14 @@ function getActiveCredits() {
 }
 
 function scaleMarketPrice(rawFvm, auctionCredits) {
+  // Returns the market value expressed in THIS league's economy: the raw FVM
+  // (listone scale) is rescaled so that the market prices of all rosterable
+  // players sum to the money actually available (numTeams * credits).
   if (!rawFvm || rawFvm <= 0) return null;
   const credits = auctionCredits || getActiveCredits();
-  return Math.max(1, Math.round(rawFvm * credits / FVM_REF_CREDITS));
+  const numTeams = auctionData?.num_teams || 10;
+  const calib = ensurePriceCalib(credits, numTeams);
+  return Math.max(1, Math.round(rawFvm * credits / FVM_REF_CREDITS * (calib.mktScale || 1)));
 }
 
 // ── Toast ──
@@ -2698,9 +2703,8 @@ function recommendedPrice(bp, role, tier, inflation, scarcity, maxBid, marketPri
   const analytical = bp * infl * scarcity;
   let raw;
   if (marketPrice && marketPrice > 0) {
-    const mktN = marketPrice * (_priceCalib?.mktScale || 1);
-    raw = analytical * 0.55 + mktN * 0.45;
-    raw = Math.max(raw, mktN * 0.6);
+    raw = analytical * 0.55 + marketPrice * 0.45;
+    raw = Math.max(raw, marketPrice * 0.6);
   } else {
     raw = analytical;
   }
@@ -3234,11 +3238,11 @@ async function openPlayer(id) {
 
   const mktRaw = pl.avg_auction_price || null;
   const mktScaled = scaleMarketPrice(mktRaw, credits);
-  const isScaled = mktRaw && credits !== FVM_REF_CREDITS;
+  const isScaled = mktRaw && mktScaled && mktScaled !== mktRaw;
   const mktValHtml = mktScaled ? (isScaled
-    ? `${mktScaled}<span style="font-size:.65rem;color:var(--text3);font-weight:400;display:block;">${mktRaw}@${FVM_REF_CREDITS}cr</span>`
+    ? `${mktScaled}<span style="font-size:.65rem;color:var(--text3);font-weight:400;display:block;" title="Valore FVM del listone (calibrato per leghe più ricche)">FVM ${mktRaw}</span>`
     : `${mktScaled}`) : '-';
-  const mktLabel = isScaled ? `Media aste (${credits}cr)` : 'Media aste';
+  const mktLabel = isScaled ? 'Media aste (lega)' : 'Media aste';
   const relPct = Math.round(reliability * 100);
   const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
   const relLabel = isProjected ? 'Affid. stimata' : 'Affidabilità';
