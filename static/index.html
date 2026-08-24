@@ -1053,6 +1053,7 @@ function renderAuctionIndicator() {
 }
 
 function closeAuction() {
+  if (purchaseSub) { sb.removeChannel(purchaseSub); purchaseSub = null; }
   currentAuction = null;
   auctionData = null;
   teamsCache = [];
@@ -1564,7 +1565,6 @@ async function quickBuy() {
   toast(`${calledPlayer.name} acquistato a ${currentBid}!`);
   closeCallPanel();
   refreshDashboard();
-  refreshStrategyPanel();
 }
 
 async function assignToOther() {
@@ -1600,7 +1600,6 @@ async function confirmAssign() {
   toast(`${calledPlayer.name} assegnato a ${team?.name} per ${price}`);
   closeCallPanel();
   refreshDashboard();
-  refreshStrategyPanel();
 }
 
 function closeCallPanel() {
@@ -2615,7 +2614,19 @@ async function loadAuction(id) {
   document.getElementById('strategy-section').style.display = '';
   updateNavState();
   loadExistingAuctions();
+  subscribePurchases();
   navigateTo('dashboard');
+}
+
+let purchaseSub = null;
+function subscribePurchases() {
+  if (purchaseSub) { sb.removeChannel(purchaseSub); purchaseSub = null; }
+  if (!currentAuction) return;
+  purchaseSub = sb.channel('purchases-live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'purchases', filter:`auction_id=eq.${currentAuction}`}, () => {
+      if (document.getElementById('view-dashboard').classList.contains('active')) refreshDashboard();
+    })
+    .subscribe();
 }
 
 // ── Dashboard ──
