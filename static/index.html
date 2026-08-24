@@ -1060,9 +1060,10 @@ function computeInflation(purchases, playerMap, seasonMap) {
 }
 
 function computeReliability(appearances, sortedApps) {
-  const n = sortedApps.length;
+  const active = sortedApps.filter(a => a > 0);
+  const n = active.length;
   if (n === 0 || appearances < 1) return 0.3;
-  let rank = sortedApps.findIndex(a => appearances >= a);
+  let rank = active.findIndex(a => appearances >= a);
   if (rank === -1) rank = n;
   const pctile = 1 - rank / n;
   if (pctile >= 0.5) return 1.0;
