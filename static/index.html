@@ -733,6 +733,30 @@ function projectFMA(player, seasons) {
   return Math.round(fma * 100) / 100;
 }
 
+function computeBonusPerMatch(seasons) {
+  if (!seasons.length) return [];
+  const appearances = weightedStat(seasons, 'appearances');
+  if (appearances < 1) return [];
+  const items = [];
+  for (const [stat, code] of Object.entries(STAT_TO_BONUS)) {
+    const bdef = BONUS_DEFAULTS.find(b => b.code === code);
+    if (!bdef) continue;
+    const bval = bonusMap[code] || bdef.value;
+    let count;
+    if (stat === 'penalties_missed') {
+      count = weightedStat(seasons, 'penalties_taken') - weightedStat(seasons, 'penalties_scored');
+    } else {
+      count = weightedStat(seasons, stat);
+    }
+    const perMatch = count / appearances;
+    if (perMatch < 0.005 && perMatch > -0.005) continue;
+    const impact = perMatch * bval;
+    items.push({label: bdef.label, perMatch: Math.round(perMatch * 100) / 100, bval, impact: Math.round(impact * 100) / 100});
+  }
+  items.sort((a,b) => Math.abs(b.impact) - Math.abs(a.impact));
+  return items;
+}
+
 function basePrice(fma, role, initialCredits, numTeams, totalSlots) {
   if (fma <= 0) return 1;
   const pool = initialCredits * numTeams;
@@ -1312,18 +1336,45 @@ async function openPlayer(id) {
     </div>
     ${ss.length ? `<div style="overflow-x:auto;">
     <table class="log-table" style="margin-bottom:4px;">
-      <thead><tr><th>Stagione</th><th>Pres</th><th>MV</th><th>FM</th><th>${isGoalkeeper?'GS':'Gol'}</th><th>${isGoalkeeper?'Rp':'Ass'}</th><th>Amm</th><th>Esp</th></tr></thead>
-      <tbody>${ss.map(s => `<tr>
+      <thead><tr><th>Stagione</th><th>Pres</th><th>Tit</th><th>Sub</th><th>MV</th><th>FM</th><th>${isGoalkeeper?'GS':'Gol'}</th><th>${isGoalkeeper?'Rp':'Ass'}</th><th>Amm</th><th>Esp</th></tr></thead>
+      <tbody>${ss.map(s => {
+        const app = s.appearances||0;
+        const sp = s.starter_pct||0;
+        const tit = sp > 0 ? Math.round(app * sp / 100) : '-';
+        const sub = sp > 0 ? app - Math.round(app * sp / 100) : '-';
+        return `<tr>
         <td style="font-weight:600;">${s.season}</td>
-        <td>${s.appearances||0}</td>
+        <td>${app}</td>
+        <td style="color:var(--green);">${tit}</td>
+        <td style="color:var(--yellow);">${sub}</td>
         <td>${s.avg_rating||'-'}</td>
         <td>${s.fanta_avg||'-'}</td>
         <td>${isGoalkeeper ? (s.goals_conceded||0) : (s.goals||0)}</td>
         <td>${isGoalkeeper ? (s.penalties_saved||0) : (s.assists||0)}</td>
         <td>${s.yellow_cards||0}</td>
         <td>${s.red_cards||0}</td>
-      </tr>`).join('')}</tbody>
+      </tr>`;}).join('')}</tbody>
     </table></div>` : ''}
+    ${(() => {
+      const bpm = computeBonusPerMatch(ss);
+      if (!bpm.length) return '';
+      const totalImpact = bpm.reduce((a,b) => a + b.impact, 0);
+      return `<div style="margin-top:10px;">
+        <h4 style="margin-bottom:6px;">Bonus previsti per partita</h4>
+        <div style="overflow-x:auto;"><table class="log-table" style="margin-bottom:4px;">
+          <thead><tr><th>Bonus</th><th>Freq/partita</th><th>Valore</th><th>Impatto</th></tr></thead>
+          <tbody>${bpm.map(b => `<tr>
+            <td>${b.label}</td>
+            <td>${b.perMatch.toFixed(2)}</td>
+            <td>${b.bval > 0 ? '+' : ''}${b.bval}</td>
+            <td style="color:${b.impact >= 0 ? 'var(--green)' : 'var(--red)'};">${b.impact > 0 ? '+' : ''}${b.impact.toFixed(2)}</td>
+          </tr>`).join('')}
+          <tr style="border-top:1px solid var(--border2);font-weight:700;">
+            <td colspan="3">Totale bonus/partita</td>
+            <td style="color:${totalImpact >= 0 ? 'var(--green)' : 'var(--red)'};">${totalImpact > 0 ? '+' : ''}${totalImpact.toFixed(2)}</td>
+          </tr></tbody>
+        </table></div></div>`;
+    })()}
     ${purchaseHtml}
   `;
   document.getElementById('player-modal').classList.add('open');
@@ -1497,6 +1548,7 @@ const STAT_COL_MAP = {
   'gs':'goals_conceded','gol subiti':'goals_conceded',
   'pi':'clean_sheets','porta inviolata':'clean_sheets',
   'ass f':'assists_set_piece','assist fermo':'assists_set_piece',
+  'tit':'starter_pct','% tit':'starter_pct','tit%':'starter_pct','titolare':'starter_pct',
 };
 
 function parseFile(file) {
