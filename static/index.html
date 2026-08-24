@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FantaWizard</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #1a1d28;
+  --bg3: #242736;
+  --text: #e8eaf0;
+  --text2: #9ca3b4;
+  --accent: #6c5ce7;
+  --accent2: #a29bfe;
+  --green: #00b894;
+  --yellow: #fdcb6e;
+  --red: #e17055;
+  --border: #2d3045;
+  --radius: 8px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height:100vh; }
+a { color: var(--accent2); text-decoration: none; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 0; position:sticky; top:0; z-index:100; }
+header .container { display:flex; align-items:center; gap:20px; }
+header h1 { font-size:1.4rem; color:var(--accent2); white-space:nowrap; }
+header nav { display:flex; gap:8px; }
+header nav button { background:var(--bg3); color:var(--text2); border:1px solid var(--border); padding:6px 14px; border-radius:var(--radius); cursor:pointer; font-size:.85rem; transition:.15s; }
+header nav button:hover, header nav button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+.view { display:none; padding: 20px 0; }
+.view.active { display:block; }
+
+/* Setup */
+.setup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media(max-width:800px){ .setup-grid{grid-template-columns:1fr;} }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.card h2 { font-size:1.1rem; margin-bottom:14px; color:var(--accent2); }
+.field { margin-bottom:12px; }
+.field label { display:block; font-size:.8rem; color:var(--text2); margin-bottom:4px; }
+.field input, .field select { width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border); padding:8px 10px; border-radius:var(--radius); font-size:.9rem; }
+.field input:focus, .field select:focus { outline:none; border-color:var(--accent); }
+.btn { background:var(--accent); color:#fff; border:none; padding:10px 24px; border-radius:var(--radius); cursor:pointer; font-size:.9rem; font-weight:600; transition:.15s; }
+.btn:hover { background:var(--accent2); }
+.btn-sm { padding:5px 12px; font-size:.8rem; }
+.btn-danger { background:var(--red); }
+
+/* Bonus table */
+.bonus-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+.bonus-table th { text-align:left; padding:6px 8px; color:var(--text2); border-bottom:1px solid var(--border); font-weight:500; }
+.bonus-table td { padding:5px 8px; border-bottom:1px solid var(--border); }
+.bonus-table input[type=number] { width:60px; background:var(--bg3); color:var(--text); border:1px solid var(--border); padding:4px 6px; border-radius:4px; text-align:center; }
+.bonus-table input[type=checkbox] { accent-color:var(--accent); }
+
+/* Dashboard */
+.dash-top { display:grid; grid-template-columns:1fr 300px; gap:20px; margin-bottom:20px; }
+@media(max-width:900px){ .dash-top{grid-template-columns:1fr;} }
+
+.search-box { position:relative; }
+.search-box input { width:100%; padding:12px 16px; font-size:1.1rem; background:var(--bg2); color:var(--text); border:2px solid var(--border); border-radius:var(--radius); }
+.search-box input:focus { border-color:var(--accent); outline:none; }
+.search-results { position:absolute; top:100%; left:0; right:0; background:var(--bg2); border:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); max-height:400px; overflow-y:auto; z-index:50; display:none; }
+.search-results.open { display:block; }
+.sr-item { padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); transition:.1s; }
+.sr-item:hover { background:var(--bg3); }
+.sr-item .name { font-weight:600; }
+.sr-item .meta { font-size:.8rem; color:var(--text2); }
+.sr-item .price-tag { font-size:.85rem; font-weight:700; padding:2px 8px; border-radius:4px; }
+.sr-item .price-tag.t1 { background:var(--green); color:#000; }
+.sr-item .price-tag.t2 { background:var(--accent2); color:#000; }
+.sr-item .price-tag.t3 { background:var(--yellow); color:#000; }
+.sr-item .price-tag.t4 { background:var(--text2); color:#000; }
+.sr-item.sold { opacity:.4; }
+
+/* Player modal */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; width:600px; max-width:95vw; max-height:90vh; overflow-y:auto; padding:24px; }
+.modal h2 { margin-bottom:4px; }
+.modal .subtitle { color:var(--text2); font-size:.9rem; margin-bottom:16px; }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(100px,1fr)); gap:10px; margin:16px 0; }
+.stat-box { background:var(--bg3); padding:10px; border-radius:var(--radius); text-align:center; }
+.stat-box .val { font-size:1.3rem; font-weight:700; color:var(--accent2); }
+.stat-box .lbl { font-size:.7rem; color:var(--text2); margin-top:2px; }
+.convenience { font-size:1.4rem; font-weight:700; padding:4px 12px; border-radius:var(--radius); display:inline-block; }
+.convenience.good { background:var(--green); color:#000; }
+.convenience.fair { background:var(--yellow); color:#000; }
+.convenience.bad { background:var(--red); color:#fff; }
+
+.purchase-form { display:flex; gap:10px; align-items:end; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+.purchase-form .field { margin:0; flex:1; }
+
+/* Budget bar */
+.budget-bars { display:flex; flex-direction:column; gap:8px; }
+.budget-bar-row { display:flex; align-items:center; gap:8px; font-size:.85rem; }
+.budget-bar-row .role-label { width:20px; font-weight:700; color:var(--accent2); }
+.budget-bar-row .bar-bg { flex:1; height:18px; background:var(--bg3); border-radius:9px; overflow:hidden; }
+.budget-bar-row .bar-fill { height:100%; border-radius:9px; transition:width .3s; }
+.budget-bar-row .bar-nums { width:100px; text-align:right; color:var(--text2); font-size:.8rem; }
+
+/* Purchases log */
+.log-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+.log-table th { text-align:left; padding:8px; color:var(--text2); border-bottom:1px solid var(--border); }
+.log-table td { padding:6px 8px; border-bottom:1px solid var(--border); }
+.log-table .undo-btn { background:none; border:none; color:var(--red); cursor:pointer; font-size:.8rem; }
+
+/* Tiers view */
+.tier-columns { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+@media(max-width:900px){ .tier-columns{grid-template-columns:1fr 1fr;} }
+.tier-col h3 { text-align:center; padding:8px; border-radius:var(--radius) var(--radius) 0 0; font-size:.9rem; }
+.tier-col.t1 h3 { background:var(--green); color:#000; }
+.tier-col.t2 h3 { background:var(--accent2); color:#000; }
+.tier-col.t3 h3 { background:var(--yellow); color:#000; }
+.tier-col.t4 h3 { background:var(--text2); color:#000; }
+.tier-player { padding:6px 10px; font-size:.8rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; background:var(--bg2); }
+.tier-player.sold { opacity:.35; text-decoration:line-through; }
+.tier-player .fma { color:var(--accent2); font-weight:600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>FantaWizard</h1>
+    <nav id="nav">
+      <button data-view="setup" class="active">Setup</button>
+      <button data-view="dashboard">Asta Live</button>
+      <button data-view="tiers">Tier List</button>
+      <button data-view="teams">Rose</button>
+      <button data-view="import">Dati</button>
+    </nav>
+  </div>
+</header>
+
+<!-- ═══ SETUP ═══ -->
+<div id="view-setup" class="view active">
+<div class="container">
+  <div class="setup-grid">
+    <div class="card">
+      <h2>Nuova Asta</h2>
+      <div class="field"><label>Nome asta</label><input id="s-name" value="La mia asta"></div>
+      <div class="field"><label>Modalità</label>
+        <select id="s-mode"><option value="classic">Classic (P/D/C/A)</option><option value="mantra">Mantra</option></select>
+      </div>
+      <div class="field"><label>Tipo asta</label>
+        <select id="s-type"><option value="chiamata">Chiamata classica</option><option value="busta">Busta chiusa</option></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field"><label>N° squadre</label><input id="s-teams" type="number" value="8" min="2" max="20"></div>
+        <div class="field"><label>Crediti iniziali</label><input id="s-credits" type="number" value="500" step="50"></div>
+        <div class="field"><label>Giornate</label><input id="s-matchdays" type="number" value="38"></div>
+      </div>
+      <h2 style="margin-top:18px;">Rosa per ruolo</h2>
+      <div id="roster-slots" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+      <h2 style="margin-top:18px;">Budget % per reparto</h2>
+      <div id="budget-splits" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+      <div style="margin-top:16px;"><button class="btn" onclick="createAuction()">Crea Asta</button></div>
+      <div id="existing-auctions" style="margin-top:20px;"></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:20px;">
+        <h2>Bonus / Malus</h2>
+        <table class="bonus-table" id="bonus-table">
+          <thead><tr><th>Evento</th><th>Valore</th><th>On</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Modificatori</h2>
+        <div id="modifiers-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div id="view-dashboard" class="view">
+<div class="container">
+  <div class="dash-top">
+    <div>
+      <div class="search-box">
+        <input id="player-search" placeholder="Cerca giocatore (min 2 lettere)..." autocomplete="off">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div style="margin-top:20px;">
+        <h2 style="font-size:1rem;margin-bottom:10px;">Ultimi acquisti</h2>
+        <table class="log-table">
+          <thead><tr><th>Giocatore</th><th>Ruolo</th><th>Squadra</th><th>Prezzo</th><th>Acquirente</th><th></th></tr></thead>
+          <tbody id="purchases-log"></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Il mio budget</h2>
+        <div id="budget-display"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ PLAYER MODAL ═══ -->
+<div class="modal-overlay" id="player-modal">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<!-- ═══ TIERS ═══ -->
+<div id="view-tiers" class="view">
+<div class="container">
+  <div style="display:flex;gap:10px;margin-bottom:16px;">
+    <button class="btn btn-sm" onclick="showTierRole('P')">Portieri</button>
+    <button class="btn btn-sm" onclick="showTierRole('D')">Difensori</button>
+    <button class="btn btn-sm" onclick="showTierRole('C')">Centrocampisti</button>
+    <button class="btn btn-sm" onclick="showTierRole('A')">Attaccanti</button>
+  </div>
+  <div class="tier-columns" id="tier-display"></div>
+</div>
+</div>
+
+<!-- ═══ TEAMS ═══ -->
+<div id="view-teams" class="view">
+<div class="container">
+  <div id="teams-display"></div>
+</div>
+</div>
+
+<!-- ═══ IMPORT ═══ -->
+<div id="view-import" class="view">
+<div class="container">
+  <div class="setup-grid">
+    <div class="card">
+      <h2>Importa Quotazioni (Listone)</h2>
+      <p style="font-size:.85rem;color:var(--text2);margin-bottom:12px;">Carica il file Excel/CSV delle quotazioni da Fantacalcio.it</p>
+      <input type="file" id="file-quotazioni" accept=".xlsx,.xls,.csv">
+      <button class="btn" style="margin-top:10px;" onclick="uploadQuotazioni()">Importa</button>
+      <div id="import-q-result" style="margin-top:8px;font-size:.85rem;"></div>
+    </div>
+    <div class="card">
+      <h2>Importa Statistiche Stagionali</h2>
+      <div class="field"><label>Stagione</label><input id="stat-season" value="2024/25"></div>
+      <input type="file" id="file-stats" accept=".xlsx,.xls,.csv">
+      <button class="btn" style="margin-top:10px;" onclick="uploadStats()">Importa</button>
+      <div id="import-s-result" style="margin-top:8px;font-size:.85rem;"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const API = '';
+let currentAuction = null;
+let auctionData = null;
+
+// ── Navigation ──
+document.querySelectorAll('#nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if (btn.dataset.view === 'dashboard' && currentAuction) refreshDashboard();
+    if (btn.dataset.view === 'tiers' && currentAuction) showTierRole('A');
+    if (btn.dataset.view === 'teams' && currentAuction) refreshTeams();
+  });
+});
+
+// ── Setup defaults ──
+const DEFAULT_ROLES = {P:3,D:8,C:8,A:6};
+const DEFAULT_BUDGET = {P:8,D:20,C:27,A:45};
+
+function renderSetupRoles() {
+  const el = document.getElementById('roster-slots');
+  el.innerHTML = '';
+  for (const [r,c] of Object.entries(DEFAULT_ROLES)) {
+    el.innerHTML += `<div class="field"><label>${r}</label><input type="number" class="roster-input" data-role="${r}" value="${c}" min="0" max="30"></div>`;
+  }
+}
+
+function renderSetupBudget() {
+  const el = document.getElementById('budget-splits');
+  el.innerHTML = '';
+  for (const [r,p] of Object.entries(DEFAULT_BUDGET)) {
+    el.innerHTML += `<div class="field"><label>${r} %</label><input type="number" class="budget-input" data-role="${r}" value="${p}" min="0" max="100" step="1"></div>`;
+  }
+}
+
+async function loadBonusDefaults() {
+  const tbody = document.querySelector('#bonus-table tbody');
+  const defaults = [
+    {code:'GOL',label:'Gol segnato',value:3,adv:false},
+    {code:'GOL_SUBITO',label:'Gol subito',value:-1,adv:false},
+    {code:'ASSIST',label:'Assist',value:1,adv:false},
+    {code:'ASSIST_FERMO',label:'Assist da fermo',value:1,adv:false},
+    {code:'RIGORE_SEGNATO',label:'Rigore segnato',value:3,adv:false},
+    {code:'RIGORE_SBAGLIATO',label:'Rigore sbagliato',value:-3,adv:false},
+    {code:'RIGORE_PARATO',label:'Rigore parato',value:3,adv:false},
+    {code:'AMMONIZIONE',label:'Ammonizione',value:-0.5,adv:false},
+    {code:'ESPULSIONE',label:'Espulsione',value:-1,adv:false},
+    {code:'AUTOGOL',label:'Autogol',value:-2,adv:false},
+    {code:'PORTA_INVIOLATA',label:'Clean sheet 90min',value:0,adv:true},
+    {code:'GOL_VITTORIA',label:'Gol vittoria',value:0,adv:true},
+    {code:'GOL_PAREGGIO',label:'Gol pareggio',value:0,adv:true},
+    {code:'PALO_TRAVERSA',label:'Palo/traversa',value:0,adv:true},
+    {code:'RIGORE_CONQUISTATO',label:'Rigore conquistato',value:0,adv:true},
+    {code:'RIGORE_CAUSATO',label:'Rigore causato',value:0,adv:true},
+    {code:'SALVATAGGIO',label:'Salvataggio decisivo',value:0,adv:true},
+    {code:'ERRORE_DECISIVO',label:'Errore decisivo',value:0,adv:true},
+    {code:'GOL_FUORI_AREA',label:'Gol da fuori area',value:0,adv:true},
+  ];
+  let html = '';
+  for (const b of defaults) {
+    const checked = b.value !== 0 ? 'checked' : '';
+    const cls = b.adv ? 'style="color:var(--text2)"' : '';
+    html += `<tr ${cls}>
+      <td>${b.label}</td>
+      <td><input type="number" step="0.5" value="${b.value}" data-bonus="${b.code}" class="bonus-val"></td>
+      <td><input type="checkbox" ${checked} data-bonus-chk="${b.code}" class="bonus-chk"></td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+function loadModifierDefaults() {
+  const el = document.getElementById('modifiers-list');
+  const mods = [
+    {code:'MOD_DIFESA',label:'Modificatore difesa'},
+    {code:'MOD_PORTIERE',label:'Modificatore portiere'},
+    {code:'MOD_CC',label:'Modificatore centrocampo'},
+    {code:'MOD_FAIRPLAY',label:'Modificatore fairplay'},
+    {code:'MOD_CAPITANO',label:'Capitano'},
+  ];
+  el.innerHTML = mods.map(m => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.9rem;cursor:pointer;">
+      <input type="checkbox" data-mod="${m.code}" class="mod-chk" style="accent-color:var(--accent);">
+      ${m.label}
+    </label>
+  `).join('');
+}
+
+async function loadExistingAuctions() {
+  const res = await fetch(API + '/api/auctions');
+  const auctions = await res.json();
+  const el = document.getElementById('existing-auctions');
+  if (!auctions.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<h2 style="margin-bottom:10px;">Aste esistenti</h2>' +
+    auctions.map(a => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px;">
+        <span><strong>${a.name}</strong> — ${a.num_teams} squadre, ${a.initial_credits} crediti</span>
+        <button class="btn btn-sm" onclick="loadAuction(${a.id})">Apri</button>
+      </div>
+    `).join('');
+}
+
+// ── Create Auction ──
+async function createAuction() {
+  const roster_slots = [...document.querySelectorAll('.roster-input')].map(i => ({role:i.dataset.role, count:parseInt(i.value)||0}));
+  const bonus_rules = [...document.querySelectorAll('.bonus-val')].map(i => ({
+    code: i.dataset.bonus,
+    value: parseFloat(i.value)||0,
+    enabled: document.querySelector(`[data-bonus-chk="${i.dataset.bonus}"]`).checked,
+  }));
+  const modifiers = [...document.querySelectorAll('.mod-chk')].map(i => ({code:i.dataset.mod, enabled:i.checked}));
+  const budget_splits = [...document.querySelectorAll('.budget-input')].map(i => ({role:i.dataset.role, percentage:parseFloat(i.value)||0}));
+
+  const body = {
+    name: document.getElementById('s-name').value,
+    mode: document.getElementById('s-mode').value,
+    auction_type: document.getElementById('s-type').value,
+    num_teams: parseInt(document.getElementById('s-teams').value)||8,
+    initial_credits: parseInt(document.getElementById('s-credits').value)||500,
+    num_matchdays: parseInt(document.getElementById('s-matchdays').value)||38,
+    roster_slots, bonus_rules, modifiers, budget_splits,
+  };
+
+  const res = await fetch(API + '/api/auctions', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const data = await res.json();
+  await loadAuction(data.id);
+}
+
+async function loadAuction(id) {
+  const res = await fetch(API + '/api/auctions/' + id);
+  auctionData = await res.json();
+  currentAuction = id;
+  document.querySelector('[data-view="dashboard"]').click();
+}
+
+// ── Dashboard ──
+let searchTimeout = null;
+document.getElementById('player-search').addEventListener('input', (e) => {
+  clearTimeout(searchTimeout);
+  const q = e.target.value.trim();
+  if (q.length < 2) { document.getElementById('search-results').classList.remove('open'); return; }
+  searchTimeout = setTimeout(() => searchPlayers(q), 200);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-box')) document.getElementById('search-results').classList.remove('open');
+});
+
+async function searchPlayers(q) {
+  if (!currentAuction) return;
+  const res = await fetch(API + `/api/players/search?q=${encodeURIComponent(q)}&auction_id=${currentAuction}`);
+  const players = await res.json();
+  const el = document.getElementById('search-results');
+  el.innerHTML = players.map(p => `
+    <div class="sr-item ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
+      <div>
+        <span class="name">${p.name}</span>
+        <span class="meta">${p.role_classic} · ${p.team} ${p.is_penalty_taker?'⚽':''}${p.sold?' · VENDUTO':''}</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="price-tag t${p.tier}">F${p.tier}</span>
+        <span style="font-weight:700;color:var(--green);">${p.recommended_price}</span>
+      </div>
+    </div>
+  `).join('');
+  el.classList.add('open');
+}
+
+async function openPlayer(id) {
+  document.getElementById('search-results').classList.remove('open');
+  const res = await fetch(API + `/api/players/${id}?auction_id=${currentAuction}`);
+  const p = await res.json();
+
+  const teamsRes = await fetch(API + `/api/auctions/${currentAuction}`);
+  const ad = await teamsRes.json();
+
+  const seasons = p.seasons || [];
+  const lastSeason = seasons[0] || {};
+
+  const teamOpts = ad.teams.map(t => `<option value="${t.id}" ${t.is_user?'selected':''}>${t.name}</option>`).join('');
+
+  document.getElementById('modal-content').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;">
+      <div>
+        <h2>${p.name} <span class="price-tag t${p.tier}" style="font-size:.8rem;">Fascia ${p.tier}</span></h2>
+        <div class="subtitle">${p.role_classic}${p.role_mantra?' · '+p.role_mantra:''} · ${p.team} ${p.is_penalty_taker?'· Rigorista':''} ${p.is_freekick_taker?'· Punizioni':''}</div>
+      </div>
+      <button onclick="document.getElementById('player-modal').classList.remove('open')" style="background:none;border:none;color:var(--text2);font-size:1.5rem;cursor:pointer;">✕</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="val">${p.fma}</div><div class="lbl">FMA attesa</div></div>
+      <div class="stat-box"><div class="val" style="color:var(--green);">${p.recommended_price}</div><div class="lbl">Prezzo consigliato</div></div>
+      <div class="stat-box"><div class="val">${p.initial_price}</div><div class="lbl">Quotazione</div></div>
+      <div class="stat-box"><div class="val">${p.max_bid}</div><div class="lbl">Max bid</div></div>
+    </div>
+    <h3 style="font-size:.9rem;margin:12px 0 8px;">Ultime stagioni</h3>
+    <table class="log-table">
+      <thead><tr><th>Stagione</th><th>Pres.</th><th>MV</th><th>FM</th><th>Gol</th><th>Assist</th><th>Amm</th></tr></thead>
+      <tbody>
+        ${seasons.map(s => `<tr><td>${s.season}</td><td>${s.appearances}</td><td>${s.avg_rating}</td><td>${s.fanta_avg}</td><td>${s.goals}</td><td>${s.assists}</td><td>${s.yellow_cards}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="purchase-form">
+      <div class="field"><label>Prezzo</label><input type="number" id="buy-price" min="1" value="${p.recommended_price}" autofocus></div>
+      <div class="field"><label>Acquirente</label><select id="buy-team">${teamOpts}</select></div>
+      <button class="btn" onclick="buyPlayer(${p.id})">Compra</button>
+    </div>
+  `;
+  document.getElementById('player-modal').classList.add('open');
+  document.getElementById('buy-price').focus();
+  document.getElementById('buy-price').select();
+}
+
+async function buyPlayer(playerId) {
+  const price = parseInt(document.getElementById('buy-price').value);
+  const teamId = parseInt(document.getElementById('buy-team').value);
+  if (!price || price < 1) return;
+
+  await fetch(API + `/api/auctions/${currentAuction}/purchases`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({player_id:playerId, team_id:teamId, price:price}),
+  });
+
+  document.getElementById('player-modal').classList.remove('open');
+  document.getElementById('player-search').value = '';
+  refreshDashboard();
+}
+
+async function refreshDashboard() {
+  if (!currentAuction) return;
+  refreshPurchases();
+  refreshBudget();
+}
+
+async function refreshPurchases() {
+  const res = await fetch(API + `/api/auctions/${currentAuction}/purchases`);
+  const purchases = await res.json();
+  const el = document.getElementById('purchases-log');
+  el.innerHTML = purchases.map(p => `
+    <tr>
+      <td><strong>${p.player_name}</strong></td>
+      <td>${p.player_role}</td>
+      <td>${p.player_team}</td>
+      <td style="font-weight:700;">${p.price}</td>
+      <td>${p.team_name}</td>
+      <td><button class="undo-btn" onclick="undoPurchase(${p.id})">annulla</button></td>
+    </tr>
+  `).join('');
+}
+
+async function undoPurchase(id) {
+  await fetch(API + `/api/auctions/${currentAuction}/purchases/${id}`, {method:'DELETE'});
+  refreshDashboard();
+}
+
+async function refreshBudget() {
+  const res = await fetch(API + `/api/auctions/${currentAuction}/budget`);
+  const b = await res.json();
+  const el = document.getElementById('budget-display');
+  const pct = ((b.total_spent / b.total_budget) * 100).toFixed(0);
+  let html = `
+    <div style="font-size:1.8rem;font-weight:700;color:var(--green);">${b.total_remaining}</div>
+    <div style="font-size:.8rem;color:var(--text2);margin-bottom:12px;">crediti rimasti su ${b.total_budget} — ${b.total_bought}/${b.total_slots} slot</div>
+    <div class="budget-bars">
+  `;
+  for (const [role, data] of Object.entries(b.by_role)) {
+    const spent_pct = data.budget_allocated > 0 ? (data.spent / data.budget_allocated * 100) : 0;
+    const color = spent_pct > 100 ? 'var(--red)' : spent_pct > 80 ? 'var(--yellow)' : 'var(--green)';
+    html += `
+      <div class="budget-bar-row">
+        <span class="role-label">${role}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(spent_pct,100)}%;background:${color};"></div></div>
+        <span class="bar-nums">${data.spent}/${data.budget_allocated} (${data.slots_filled}/${data.slots_total})</span>
+      </div>
+    `;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ── Tiers ──
+async function showTierRole(role) {
+  if (!currentAuction) return;
+  const res = await fetch(API + `/api/auctions/${currentAuction}/tiers`);
+  const tiers = await res.json();
+  const roleTiers = tiers[role] || {};
+  const el = document.getElementById('tier-display');
+  el.innerHTML = '';
+  for (let t = 1; t <= 4; t++) {
+    const players = roleTiers[t] || [];
+    const labels = ['','Top','Solidi','Rotazione','Panchinari'];
+    el.innerHTML += `
+      <div class="tier-col t${t}">
+        <h3>Fascia ${t} — ${labels[t]}</h3>
+        ${players.map(p => `
+          <div class="tier-player ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.player_id+')'}">
+            <span>${p.name} <span style="color:var(--text2);font-size:.75rem;">${p.team}</span></span>
+            <span class="fma">${p.fma}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+}
+
+// ── Teams ──
+async function refreshTeams() {
+  if (!currentAuction) return;
+  const [teamsRes, purchasesRes] = await Promise.all([
+    fetch(API + `/api/auctions/${currentAuction}/teams/status`),
+    fetch(API + `/api/auctions/${currentAuction}/purchases`),
+  ]);
+  const teams = await teamsRes.json();
+  const purchases = await purchasesRes.json();
+
+  const el = document.getElementById('teams-display');
+  el.innerHTML = teams.map(t => {
+    const teamPurchases = purchases.filter(p => p.team_id === t.id);
+    return `
+      <div class="card" style="margin-bottom:16px;">
+        <h2>${t.name} ${t.is_user?'(Tu)':''}</h2>
+        <div style="font-size:.85rem;color:var(--text2);margin-bottom:8px;">
+          Spesi: ${t.spent}/${t.spent+t.remaining} · Rimasti: ${t.remaining} · Slot: ${t.players_bought}/${t.players_bought+t.slots_remaining}
+        </div>
+        ${teamPurchases.length ? `<table class="log-table"><thead><tr><th>Giocatore</th><th>Ruolo</th><th>Prezzo</th></tr></thead><tbody>
+          ${teamPurchases.map(p => `<tr><td>${p.player_name}</td><td>${p.player_role}</td><td>${p.price}</td></tr>`).join('')}
+        </tbody></table>` : '<div style="color:var(--text2);font-size:.85rem;">Nessun acquisto</div>'}
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Import ──
+async function uploadQuotazioni() {
+  const file = document.getElementById('file-quotazioni').files[0];
+  if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch(API + '/api/import/quotazioni', {method:'POST', body:fd});
+  const data = await res.json();
+  document.getElementById('import-q-result').textContent = `Importati ${data.imported} giocatori`;
+}
+
+async function uploadStats() {
+  const file = document.getElementById('file-stats').files[0];
+  if (!file) return;
+  const season = document.getElementById('stat-season').value;
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch(API + `/api/import/stats?season=${encodeURIComponent(season)}`, {method:'POST', body:fd});
+  const data = await res.json();
+  document.getElementById('import-s-result').textContent = `Importate ${data.imported} statistiche`;
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('player-modal').classList.remove('open');
+    document.getElementById('search-results').classList.remove('open');
+  }
+  if (e.key === 'Enter' && document.getElementById('player-modal').classList.contains('open')) {
+    const btn = document.querySelector('.purchase-form .btn');
+    if (btn) btn.click();
+  }
+});
+
+// ── Init ──
+renderSetupRoles();
+renderSetupBudget();
+loadBonusDefaults();
+loadModifierDefaults();
+loadExistingAuctions();
+</script>
+</body>
+</html>
