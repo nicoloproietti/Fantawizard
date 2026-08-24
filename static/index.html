@@ -1351,9 +1351,13 @@ function computeInflation(purchases, playerMap, seasonMap) {
   return inflation;
 }
 
-function computeReliability(lastSeasonApps, maxApps, starterPct) {
+function computeReliability(lastSeasonApps, maxApps, starterPct, gamesMissedInjury) {
   if (maxApps < 1 || lastSeasonApps < 1) return 0;
-  const appRatio = lastSeasonApps / maxApps;
+
+  const availableApps = gamesMissedInjury > 0
+    ? Math.max(lastSeasonApps, maxApps - gamesMissedInjury)
+    : maxApps;
+  const appRatio = lastSeasonApps / availableApps;
 
   let effectiveRatio = appRatio;
   if (starterPct >= 60 && appRatio < 0.65 && lastSeasonApps >= 10) {
@@ -1410,8 +1414,9 @@ function computeTiers(players, seasonMap) {
     const fma = projectFMA(pl, ss);
     const lastApps = ss.length > 0 ? (ss[0].appearances || 0) : 0;
     const starterPct = getStarterPct(ss);
+    const gamesMissedInjury = ss.length > 0 ? (ss[0].games_missed_injury || 0) : 0;
     if (!byRole[pl.role_classic]) byRole[pl.role_classic] = [];
-    byRole[pl.role_classic].push({...pl, fma, lastApps, starterPct});
+    byRole[pl.role_classic].push({...pl, fma, lastApps, starterPct, gamesMissedInjury});
     const trKey = `${pl.team}_${pl.role_classic}`;
     if (!byTeamRole[trKey]) byTeamRole[trKey] = [];
     byTeamRole[trKey].push(pl);
@@ -1428,7 +1433,7 @@ function computeTiers(players, seasonMap) {
     for (const p of items) {
       const trKey = `${p.team}_${role}`;
       const maxApps = teamRoleMax[trKey] || 0;
-      const baseRel = computeReliability(p.lastApps, maxApps, p.starterPct);
+      const baseRel = computeReliability(p.lastApps, maxApps, p.starterPct, p.gamesMissedInjury);
       if (baseRel === 0) {
         const est = estimateStarterRole(p, byTeamRole[trKey] || []);
         p.reliability = est.reliability;
@@ -3178,6 +3183,16 @@ async function openPlayer(id) {
   const relPct = Math.round(reliability * 100);
   const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
   const relLabel = isProjected ? 'Affid. stimata' : 'Affidabilità';
+
+  const lastSeason = ss.length > 0 ? ss[0] : {};
+  const injCount = lastSeason.injuries || 0;
+  const injDays = lastSeason.days_injured || 0;
+  const injGames = lastSeason.games_missed_injury || 0;
+  const hasInjuryData = injCount > 0 || injDays > 0 || injGames > 0;
+  const injClr = injGames >= 10 ? 'var(--red)' : injGames >= 5 ? 'var(--yellow)' : 'var(--green)';
+  const injHtml = hasInjuryData
+    ? `<div class="stat-box"><div class="val" style="color:${injClr};">${injCount > 0 ? injCount + 'x' : '-'}</div><div class="lbl">Infortuni${injGames > 0 ? ` (${injGames} pg)` : ''}</div></div>`
+    : '';
   const statsGridHtml = currentAuction ? `
     <div class="stats-grid">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA grezza</div></div>
@@ -3186,6 +3201,7 @@ async function openPlayer(id) {
       <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
       <div class="stat-box"><div class="val" style="color:#2fc5ee;">${mktValHtml}</div><div class="lbl">${mktLabel}</div></div>
       <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
+      ${injHtml}
     </div>` : `
     <div class="stats-grid">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA grezza</div></div>
@@ -3194,6 +3210,7 @@ async function openPlayer(id) {
       <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
       <div class="stat-box"><div class="val" style="color:#2fc5ee;">${mktValHtml}</div><div class="lbl">${mktLabel}</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price || '-'}</div><div class="lbl">Quotazione</div></div>
+      ${injHtml}
     </div>`;
 
   document.getElementById('modal-content').innerHTML = `
@@ -3221,7 +3238,7 @@ async function openPlayer(id) {
     </div>
     ${ss.length ? `<div style="overflow-x:auto;">
     <table class="log-table" style="margin-bottom:4px;">
-      <thead><tr><th>Stagione</th><th>Pres</th><th>Tit</th><th>Sub</th><th>% Tit</th><th>MV</th><th>FM</th><th>${isGoalkeeper?'GS':'Gol'}</th><th>${isGoalkeeper?'Rp':'Ass'}</th><th>Amm</th><th>Esp</th></tr></thead>
+      <thead><tr><th>Stagione</th><th>Pres</th><th>Tit</th><th>Sub</th><th>% Tit</th><th>MV</th><th>FM</th><th>${isGoalkeeper?'GS':'Gol'}</th><th>${isGoalkeeper?'Rp':'Ass'}</th><th>Amm</th><th>Esp</th><th class="col-p1">Inf.</th></tr></thead>
       <tbody>${ss.map(s => {
         const app = s.appearances||0;
         let sp = s.starter_pct||0;
@@ -3230,6 +3247,10 @@ async function openPlayer(id) {
         const sub = sp > 0 ? app - Math.round(app * sp / 100) : '-';
         const barW = sp > 0 ? sp : 0;
         const barHtml = sp > 0 ? `<div style="display:flex;align-items:center;gap:4px;"><div style="width:40px;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;"><div style="width:${barW}%;height:100%;background:${sp>=70?'var(--green)':sp>=40?'var(--yellow)':'var(--red)'};border-radius:3px;"></div></div><span style="font-size:.65rem;color:var(--text3);">${sp}%</span></div>` : '';
+        const sInj = s.injuries||0; const sGmInj = s.games_missed_injury||0; const sDaysInj = s.days_injured||0;
+        const hasInj = sInj > 0 || sGmInj > 0;
+        const injCellClr = sGmInj >= 10 ? 'var(--red)' : sGmInj >= 5 ? 'var(--yellow)' : hasInj ? 'var(--text2)' : 'var(--text3)';
+        const injCell = hasInj ? `<span style="color:${injCellClr};font-weight:600;" title="${sInj} infortuni, ${sGmInj} pg saltate${sDaysInj ? ', '+sDaysInj+' gg' : ''}">${sInj}x (${sGmInj}pg)</span>` : '-';
         return `<tr>
         <td style="font-weight:600;">${s.season}</td>
         <td>${app}</td>
@@ -3242,6 +3263,7 @@ async function openPlayer(id) {
         <td>${isGoalkeeper ? (s.penalties_saved||0) : (s.assists||0)}</td>
         <td>${s.yellow_cards||0}</td>
         <td>${s.red_cards||0}</td>
+        <td class="col-p1">${injCell}</td>
       </tr>`;}).join('')}</tbody>
     </table></div>` : ''}
     ${(() => {
@@ -3487,6 +3509,10 @@ const STAT_COL_MAP = {
   'tit':'starter_pct','% tit':'starter_pct','tit%':'starter_pct','titolare':'starter_pct',
   'tit da':'_games_started','da titolare':'_games_started','games started':'_games_started',
   'sub':'_games_sub','da subentrato':'_games_sub','subentrato':'_games_sub',
+  'infortuni':'injuries','infort':'injuries','injuries':'injuries','num infortuni':'injuries',
+  'gg inf':'days_injured','giorni infortunio':'days_injured','days injured':'days_injured','gg infortunio':'days_injured',
+  'pg saltate inf':'games_missed_injury','partite saltate':'games_missed_injury','games missed':'games_missed_injury',
+  'pg saltate infortunio':'games_missed_injury','saltate infortunio':'games_missed_injury',
 };
 
 function parseFile(file) {
