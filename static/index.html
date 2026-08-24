@@ -651,6 +651,13 @@ let bonusMap = {};
 let modFlags = {};
 let rosterSlots = {};
 let budgetSplits = {};
+const FVM_REF_CREDITS = 500;
+
+function scaleMarketPrice(rawFvm, auctionCredits) {
+  if (!rawFvm || rawFvm <= 0) return null;
+  const credits = auctionCredits || FVM_REF_CREDITS;
+  return Math.max(1, Math.round(rawFvm * credits / FVM_REF_CREDITS));
+}
 
 // ── Toast ──
 function toast(msg) {
@@ -1080,8 +1087,9 @@ function searchPlayers(q) {
       const bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
       const tier = getPlayerTier(pl.id, pl.role_classic, tierData);
       const scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
-      const rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, pl.avg_auction_price);
-      return {...pl, fma, bp, rec, tier, mb, sold: soldIds.has(pl.id)};
+      const mkt = scaleMarketPrice(pl.avg_auction_price, auctionData.initial_credits);
+      const rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, mkt);
+      return {...pl, fma, bp, rec, tier, mb, mkt, sold: soldIds.has(pl.id)};
     });
     results.sort((a,b) => b.fma - a.fma);
 
@@ -1093,7 +1101,7 @@ function searchPlayers(q) {
         </div>
         <div style="display:flex;gap:10px;align-items:center;">
           <span class="price-tag t${p.tier}">F${p.tier}</span>
-          ${p.avg_auction_price ? `<span style="font-size:.78rem;color:#26c6da;font-weight:600;font-variant-numeric:tabular-nums;">${p.avg_auction_price}</span>` : ''}
+          ${p.mkt ? `<span style="font-size:.78rem;color:#26c6da;font-weight:600;font-variant-numeric:tabular-nums;">${p.mkt}</span>` : ''}
           <span class="rec-price">${p.rec}</span>
         </div>
       </div>
@@ -1232,7 +1240,7 @@ async function openPlayer(id) {
     bp = basePrice(fma, pl.role_classic, auctionData.initial_credits, auctionData.num_teams, totalSlots);
     tier = getPlayerTier(pl.id, pl.role_classic, tierData);
     scarcity = computeScarcity(tier, tierData[pl.role_classic]||{});
-    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, pl.avg_auction_price);
+    rec = recommendedPrice(bp, pl.role_classic, tier, infl, scarcity, mb, scaleMarketPrice(pl.avg_auction_price, auctionData.initial_credits));
   } else {
     if (!Object.keys(bonusMap).length) {
       for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
@@ -1260,18 +1268,21 @@ async function openPlayer(id) {
       <button class="btn" onclick="buyPlayer(${pl.id})">Compra</button>
     </div>` : '';
 
-  const mktPrice = pl.avg_auction_price || null;
+  const mktScaled = currentAuction ? scaleMarketPrice(pl.avg_auction_price, auctionData.initial_credits) : (pl.avg_auction_price || null);
+  const mktLabel = currentAuction && auctionData.initial_credits !== FVM_REF_CREDITS && pl.avg_auction_price
+    ? `Media aste<br><span style="font-size:.6rem;color:var(--text3);">rif. ${auctionData.initial_credits}cr</span>`
+    : 'Media aste';
   const statsGridHtml = currentAuction ? `
     <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
       <div class="stat-box"><div class="val">${rec}</div><div class="lbl">Consigliato</div></div>
-      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktPrice || '-'}</div><div class="lbl">Media aste</div></div>
+      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktScaled || '-'}</div><div class="lbl">${mktLabel}</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price}</div><div class="lbl">Quotazione</div></div>
       <div class="stat-box"><div class="val" style="color:var(--yellow);">${mb}</div><div class="lbl">Max bid</div></div>
     </div>` : `
     <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);">
       <div class="stat-box"><div class="val">${fma}</div><div class="lbl">FMA attesa</div></div>
-      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktPrice || '-'}</div><div class="lbl">Media aste</div></div>
+      <div class="stat-box"><div class="val" style="color:#26c6da;">${mktScaled || '-'}</div><div class="lbl">Media aste</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${pl.initial_price || '-'}</div><div class="lbl">Quotazione</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].appearances : '-'}</div><div class="lbl">Presenze</div></div>
       <div class="stat-box"><div class="val" style="color:var(--text);">${ss.length ? ss[0].avg_rating : '-'}</div><div class="lbl">Media voto</div></div>
