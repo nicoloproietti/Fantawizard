@@ -1103,13 +1103,20 @@ function computeTiers(players, seasonMap) {
     if (!byTeamRole[trKey]) byTeamRole[trKey] = [];
     byTeamRole[trKey].push(pl);
   }
+  const teamRoleMax = {};
+  for (const [role, items] of Object.entries(byRole)) {
+    for (const p of items) {
+      const trKey = `${p.team}_${role}`;
+      teamRoleMax[trKey] = Math.max(teamRoleMax[trKey] || 0, p.lastApps);
+    }
+  }
   const result = {};
   for (const [role, items] of Object.entries(byRole)) {
-    const maxApps = Math.max(...items.map(p => p.lastApps), 0);
     for (const p of items) {
+      const trKey = `${p.team}_${role}`;
+      const maxApps = teamRoleMax[trKey] || 0;
       const baseRel = computeReliability(p.lastApps, maxApps);
       if (baseRel === 0) {
-        const trKey = `${p.team}_${p.role_classic}`;
         const est = estimateStarterRole(p, byTeamRole[trKey] || []);
         p.reliability = est.reliability;
         p.status = est.status;
