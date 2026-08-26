@@ -3906,6 +3906,64 @@ function svgRatingChart(seasons, height = 120) {
   </svg>`;
 }
 
+function radarChart(stats, size = 140) {
+  const n = stats.length;
+  const pad = size * 0.18;
+  const full = size + pad * 2;
+  const cx = full / 2, cy = full / 2, r = size * 0.38;
+  const angleStep = (2 * Math.PI) / n;
+  const startAngle = -Math.PI / 2;
+  const pt = (i, pct) => {
+    const a = startAngle + i * angleStep;
+    return [cx + r * pct * Math.cos(a), cy + r * pct * Math.sin(a)];
+  };
+  const gridLevels = [0.25, 0.5, 0.75, 1];
+  let svg = '';
+  for (const lv of gridLevels) {
+    const pts = stats.map((_, i) => pt(i, lv).join(',')).join(' ');
+    svg += `<polygon points="${pts}" fill="none" stroke="var(--border)" stroke-width="${lv===1?'1':'0.5'}" opacity="${lv===1?'.6':'.3'}"/>`;
+  }
+  for (let i = 0; i < n; i++) {
+    const [x, y] = pt(i, 1);
+    svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--border)" stroke-width="0.5" opacity=".3"/>`;
+  }
+  const dataPts = stats.map((s, i) => pt(i, Math.min(1, Math.max(0, s.value / (s.max || 1)))).join(',')).join(' ');
+  svg += `<polygon points="${dataPts}" fill="var(--accent)" fill-opacity=".15" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>`;
+  for (let i = 0; i < n; i++) {
+    const pct = Math.min(1, Math.max(0, stats[i].value / (stats[i].max || 1)));
+    const [dx, dy] = pt(i, pct);
+    svg += `<circle cx="${dx}" cy="${dy}" r="3" fill="var(--accent)" stroke="var(--bg)" stroke-width="1.5"/>`;
+    const [lx, ly] = pt(i, 1.22);
+    const val = Number.isInteger(stats[i].value) ? stats[i].value : stats[i].value.toFixed(1);
+    svg += `<text x="${lx}" y="${ly - 5}" text-anchor="middle" fill="var(--text)" font-size="9" font-weight="700" font-family="Inter,system-ui">${val}</text>`;
+    svg += `<text x="${lx}" y="${ly + 5}" text-anchor="middle" fill="var(--text3)" font-size="7" font-family="Inter,system-ui">${stats[i].label}</text>`;
+  }
+  return `<svg viewBox="0 0 ${full} ${full}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:${size}px;">${svg}</svg>`;
+}
+
+function playerRadarStats(player, seasonMap) {
+  const ss = seasonMap[player.id] || [];
+  const apps = Math.round(weightedStat(ss, 'appearances'));
+  const fm = parseFloat(projectFMA(player, ss)) || 0;
+  const goals = Math.round(weightedStat(ss, 'goals') * 10) / 10;
+  const assists = Math.round(weightedStat(ss, 'assists') * 10) / 10;
+  const bpm = computeBonusPerMatch(ss, player.role_classic);
+  const bonus = Math.round(bpm.reduce((a, b) => a + b.impact, 0) * 100) / 100;
+  const isGK = player.role_classic === 'P';
+  const maxApps = 38;
+  const maxFm = isGK ? 7 : player.role_classic === 'A' ? 12 : player.role_classic === 'C' ? 10 : 8;
+  const maxGoals = isGK ? 0.5 : player.role_classic === 'A' ? 25 : player.role_classic === 'C' ? 12 : 4;
+  const maxAssists = isGK ? 1 : player.role_classic === 'A' ? 10 : player.role_classic === 'C' ? 12 : 6;
+  const maxBonus = isGK ? 2.5 : player.role_classic === 'A' ? 3.5 : player.role_classic === 'C' ? 2.5 : 1.5;
+  return [
+    {label: 'Pres', value: apps, max: maxApps},
+    {label: 'FM', value: fm, max: maxFm},
+    {label: 'Bonus', value: Math.max(0, bonus), max: maxBonus},
+    {label: 'Gol', value: goals, max: maxGoals},
+    {label: 'Assist', value: assists, max: maxAssists},
+  ];
+}
+
 function renderFMAGauge(fma, role, tierData) {
   const roleTiers = tierData[role] || {};
   const allFMA = Object.values(roleTiers).flat().map(p => p.fma).filter(f => f > 0);
@@ -4046,7 +4104,10 @@ async function openPlayer(id) {
     </div>
     ${statsGridHtml}
     ${purchaseHtml}
-    ${gaugeHtml}
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+      <div style="flex:0 0 auto;">${radarChart(playerRadarStats(pl, seasonMap), 160)}</div>
+      <div style="flex:1;min-width:200px;">${gaugeHtml}</div>
+    </div>
     <div class="chart-row">
       <div class="chart-card">
         <h4>${goalTitle}</h4>
@@ -4132,10 +4193,11 @@ async function openPlayer(id) {
           let starterPct = recentSeason ? (recentSeason.starter_pct || 0) : 0;
           if (!starterPct && recentSeason && recentSeason.minutes && apps > 0) starterPct = Math.min(100, Math.round((recentSeason.minutes / apps) / 90 * 100));
           const teamAlts = allPlayers.filter(p => p.team === sp.team && p.role_classic === sp.role_classic && p.id !== sp.id && p.active && !soldIds.has(p.id));
+          const miniRadar = radarChart(playerRadarStats(sp, seasonMap), 90);
           return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm);cursor:pointer;transition:background .1s;${isSold?'opacity:.4;':''}font-size:.82rem;" onclick="openPlayer(${sp.id})" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">
-            <span class="price-tag t${sTier}" style="font-size:.68rem;padding:2px 8px;">${sp.role_classic}</span>
+            <div style="flex:0 0 90px;">${miniRadar}</div>
             <span style="flex:1;min-width:0;">
-              <span style="font-weight:600;">${sp.name}</span> <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}
+              <span style="font-weight:600;">${sp.name}</span> <span class="price-tag t${sTier}" style="font-size:.62rem;padding:1px 6px;vertical-align:middle;margin-left:2px;">${sp.role_classic}</span> <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}
               <span style="display:flex;gap:10px;margin-top:3px;font-size:.72rem;color:var(--text3);">
                 <span title="Presenze ultima stagione">${apps} pres${starterPct ? ' (' + starterPct + '% tit)' : ''}</span>
                 <span title="Stessi ruolo e squadra liberi">${sp.team}: ${teamAlts.length} alt ${sp.role_classic}${teamAlts.length ? ' (' + teamAlts.map(a => a.name).slice(0,2).join(', ') + (teamAlts.length > 2 ? '...' : '') + ')' : ''}</span>
