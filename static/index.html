@@ -4106,11 +4106,11 @@ async function openPlayer(id) {
     })()}
     ${buildComparisonPanel(pl, seasonMap, tierData)}
     ${(() => {
-      const similars = findSimilarPlayers(pl.id, seasonMap, tierData, 5);
+      const similars = findSimilarPlayers(pl.id, seasonMap, tierData, 3);
       if (!similars.length) return '';
       return `<div style="margin-top:14px;">
-        <h4 style="margin-bottom:8px;font-family:var(--font-display);font-size:1rem;letter-spacing:.04em;text-transform:uppercase;">Giocatori simili</h4>
-        <div style="display:flex;flex-direction:column;gap:2px;">
+        <h4 style="margin-bottom:8px;font-family:var(--font-display);font-size:1rem;letter-spacing:.04em;text-transform:uppercase;">Alternative</h4>
+        <div style="display:flex;flex-direction:column;gap:6px;">
         ${similars.map(s => {
           const sp = s.player;
           const sss = seasonMap[sp.id] || [];
@@ -4127,13 +4127,26 @@ async function openPlayer(id) {
           const sRec = recommendedPrice(sBp, sp.role_classic, sTier, infl, sSc, 999, sMkt);
           const simPct = Math.round(s.similarity * 100);
           const isSold = soldIds.has(sp.id);
-          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--radius-sm);cursor:pointer;transition:background .1s;${isSold?'opacity:.4;':''}font-size:.82rem;" onclick="openPlayer(${sp.id})" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">
+          const recentSeason = sss.length ? sss[0] : null;
+          const apps = recentSeason ? (recentSeason.appearances || 0) : 0;
+          let starterPct = recentSeason ? (recentSeason.starter_pct || 0) : 0;
+          if (!starterPct && recentSeason && recentSeason.minutes && apps > 0) starterPct = Math.min(100, Math.round((recentSeason.minutes / apps) / 90 * 100));
+          const teamAlts = allPlayers.filter(p => p.team === sp.team && p.role_classic === sp.role_classic && p.id !== sp.id && p.active && !soldIds.has(p.id));
+          return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm);cursor:pointer;transition:background .1s;${isSold?'opacity:.4;':''}font-size:.82rem;" onclick="openPlayer(${sp.id})" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">
             <span class="price-tag t${sTier}" style="font-size:.68rem;padding:2px 8px;">${sp.role_classic}</span>
-            <span style="flex:1;font-weight:600;">${sp.name} <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}</span>
-            <span style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;">${sAdj}</span>
-            <span style="color:${sRelClr};font-size:.75rem;font-variant-numeric:tabular-nums;">${sRel}%</span>
-            <span style="color:var(--text2);font-variant-numeric:tabular-nums;">~${sRec}cr</span>
-            <span style="font-size:.68rem;padding:2px 6px;border-radius:3px;background:var(--accent-dim);color:var(--accent);font-weight:700;">${simPct}%</span>
+            <span style="flex:1;min-width:0;">
+              <span style="font-weight:600;">${sp.name}</span> <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}
+              <span style="display:flex;gap:10px;margin-top:3px;font-size:.72rem;color:var(--text3);">
+                <span title="Presenze ultima stagione">${apps} pres${starterPct ? ' (' + starterPct + '% tit)' : ''}</span>
+                <span title="Stessi ruolo e squadra liberi">${sp.team}: ${teamAlts.length} alt ${sp.role_classic}${teamAlts.length ? ' (' + teamAlts.map(a => a.name).slice(0,2).join(', ') + (teamAlts.length > 2 ? '...' : '') + ')' : ''}</span>
+              </span>
+            </span>
+            <span style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">
+              <span style="color:var(--accent);font-weight:700;">${sAdj}</span>
+              <span style="color:${sRelClr};font-size:.72rem;margin-left:4px;">${sRel}%</span><br>
+              <span style="color:var(--green);font-weight:700;font-size:.78rem;">~${sRec}cr</span>
+              <span style="font-size:.65rem;padding:1px 5px;border-radius:3px;background:var(--accent-dim);color:var(--accent);font-weight:700;margin-left:4px;">${simPct}%</span>
+            </span>
           </div>`;
         }).join('')}
         </div>
