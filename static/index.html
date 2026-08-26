@@ -612,6 +612,58 @@ a { color: var(--accent2); text-decoration: none; }
 .welcome-step-text strong { color:var(--text); }
 .welcome-step-text span { color:var(--text2); font-size:.78rem; display:block; margin-top:2px; }
 
+/* ── Hub (auction home) ── */
+.hub-header {
+  display:flex; align-items:center; gap:16px; padding:20px 24px;
+  background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius-lg);
+  margin-bottom:24px;
+}
+.hub-header-icon {
+  width:48px; height:48px; border-radius:12px;
+  background:linear-gradient(135deg, var(--accent), var(--accent2));
+  display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;
+}
+.hub-header-info h2 { font-size:1.15rem; font-weight:800; margin-bottom:2px; }
+.hub-header-info span { font-size:.8rem; color:var(--text2); }
+.hub-header-actions { margin-left:auto; display:flex; gap:8px; }
+.hub-nav-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+  gap:14px; margin-bottom:24px;
+}
+.hub-nav-card {
+  display:flex; align-items:center; gap:14px; padding:18px 20px;
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg);
+  cursor:pointer; transition:border-color .15s, transform .1s;
+}
+.hub-nav-card:hover { border-color:var(--accent); transform:translateY(-1px); }
+.hub-nav-card .hub-card-icon {
+  width:40px; height:40px; border-radius:10px; display:flex; align-items:center;
+  justify-content:center; font-size:1.2rem; flex-shrink:0;
+}
+.hub-nav-card .hub-card-text strong { display:block; font-size:.88rem; margin-bottom:2px; }
+.hub-nav-card .hub-card-text span { font-size:.72rem; color:var(--text3); }
+.hub-stats-row {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+  gap:12px; margin-bottom:24px;
+}
+.hub-stat {
+  padding:14px 16px; background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--radius); text-align:center;
+}
+.hub-stat .val { font-size:1.3rem; font-weight:800; color:var(--accent); }
+.hub-stat .lbl { font-size:.68rem; color:var(--text3); text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+.hub-auctions { margin-top:24px; }
+.hub-auction-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 18px; background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--radius); margin-bottom:8px; cursor:pointer; transition:border-color .15s;
+}
+.hub-auction-item:hover { border-color:var(--accent); }
+.hub-auction-item.active { border-color:var(--accent); background:var(--accent-dim); }
+.hub-auction-item .info strong { font-size:.9rem; }
+.hub-auction-item .info span { font-size:.78rem; color:var(--text2); margin-left:8px; }
+.hub-auction-item .actions { display:flex; gap:8px; }
+
 /* ── Nav tooltip ── */
 .sidebar nav button.nav-disabled { opacity:.3; pointer-events:auto; cursor:not-allowed; position:relative; }
 .sidebar nav button.nav-disabled:hover::after {
@@ -822,9 +874,10 @@ a { color: var(--accent2); text-decoration: none; }
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">FantaWizard</div>
   <nav id="nav">
+    <button data-view="home" class="active"><span class="nav-icon">&#127968;</span>Home</button>
     <button data-view="setup"><span class="nav-icon">&#9881;</span>Setup</button>
     <button data-view="data" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#128194;</span>Dati</button>
-    <button data-view="tiers" class="active"><span class="nav-icon">&#9776;</span>Tier List</button>
+    <button data-view="tiers"><span class="nav-icon">&#9776;</span>Tier List</button>
     <button data-view="plan" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#127919;</span>Piano Asta</button>
     <button data-view="dashboard" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#9889;</span>Asta Live</button>
     <button data-view="teams" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#128101;</span>Rose</button>
@@ -835,13 +888,13 @@ a { color: var(--accent2); text-decoration: none; }
   <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
-  <span class="topbar-title" id="topbar-title">Tier List</span>
+  <span class="topbar-title" id="topbar-title">Home</span>
   <div id="auction-indicator" style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.82rem;"></div>
 </div>
 
-<div id="view-welcome" class="view">
+<div id="view-home" class="view active">
 <div class="container">
-  <div class="welcome-screen" id="welcome-content"></div>
+  <div id="home-content"></div>
 </div>
 </div>
 
@@ -1057,7 +1110,7 @@ a { color: var(--accent2); text-decoration: none; }
 </div>
 </div>
 
-<div id="view-tiers" class="view active">
+<div id="view-tiers" class="view">
 <div class="container">
   <div class="tier-filter-bar" id="tier-filter-bar">
     <button onclick="showTierRole('P')" data-role="P">Portieri</button>
@@ -1153,7 +1206,7 @@ function confirmDialog(title, message, confirmLabel, onConfirm) {
 }
 
 // ── Navigation ──
-const VIEW_TITLES = {welcome:'Benvenuto',dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
+const VIEW_TITLES = {home:'Home',dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
 const AUCTION_VIEWS = ['dashboard','plan','teams','data'];
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -1168,7 +1221,7 @@ function updateNavState() {
   if (!hasAuction) {
     const activeBtn = document.querySelector('#nav button.active');
     if (activeBtn && activeBtn.dataset.needsAuction) {
-      navigateTo('tiers');
+      navigateTo('home');
     }
   }
   renderAuctionIndicator();
@@ -1191,7 +1244,7 @@ function renderAuctionIndicator() {
   const name = auctionData ? auctionData.name : `Asta #${currentAuction}`;
   const credits = auctionData ? auctionData.initial_credits : '?';
   const nTeams = auctionData ? auctionData.num_teams : '?';
-  el.innerHTML = `<span style="color:var(--accent);font-weight:700;">${name}</span>
+  el.innerHTML = `<span style="color:var(--accent);font-weight:700;cursor:pointer;" onclick="navigateTo('home')" title="Vai alla home dell'asta">${name}</span>
     <span style="color:var(--text3);font-size:.75rem;">${nTeams}sq · ${credits}cr</span>
     <button class="btn-ghost btn-sm" style="font-size:.72rem;padding:2px 8px;" onclick="closeAuction()">Chiudi</button>`;
 }
@@ -1210,7 +1263,8 @@ function closeAuction() {
     document.getElementById('strategy-section').style.display = 'none';
     document.getElementById('analytics-section').style.display = 'none';
     updateNavState();
-    renderWelcome();
+    renderHome();
+    navigateTo('home');
     toast('Asta chiusa', 'warning');
   });
 }
@@ -1225,6 +1279,7 @@ document.querySelectorAll('#nav button').forEach(btn => {
     document.getElementById('topbar-title').textContent = VIEW_TITLES[btn.dataset.view] || '';
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-overlay').classList.remove('open');
+    if (btn.dataset.view === 'home') renderHome();
     if (btn.dataset.view === 'data') refreshDataSummary();
     if (btn.dataset.view === 'dashboard' && currentAuction) refreshDashboard();
     if (btn.dataset.view === 'tiers') showTierRole('A');
@@ -2995,8 +3050,8 @@ async function loadAuction(id) {
     updateNavState();
     loadExistingAuctions();
     subscribePurchases();
-    renderWelcome();
-    navigateTo('dashboard');
+    renderHome();
+    navigateTo('home');
   } finally { hideLoading(); }
 }
 
@@ -3863,7 +3918,7 @@ async function importQuotazioni(file) {
     toast(`${count} giocatori importati!`, 'success');
     await loadAllData();
     refreshDataSummary();
-    renderWelcome();
+    renderHome();
   } catch(err) {
     statusEl.innerHTML = `<span style="color:var(--red);">Errore: ${err.message}</span>`;
   } finally {
@@ -3985,7 +4040,7 @@ async function importStats(file) {
     toast(`Statistiche ${season}: ${count} importate!`, 'success');
     await loadAllData();
     refreshDataSummary();
-    renderWelcome();
+    renderHome();
   } catch(err) {
     statusEl.innerHTML = `<span style="color:var(--red);">Errore: ${err.message}</span>`;
   } finally {
@@ -4054,50 +4109,170 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ── Welcome / Onboarding ──
-function renderWelcome() {
-  const el = document.getElementById('welcome-content');
+// ── Home / Hub ──
+function renderHome() {
+  const el = document.getElementById('home-content');
   if (!el) return;
   const hasData = allPlayers.length > 0;
   const hasSeasons = allSeasons.length > 0;
   const hasAuction = !!currentAuction;
-  const allDone = hasData && hasSeasons && hasAuction;
-  if (allDone) {
-    document.getElementById('view-welcome').style.display = 'none';
-    return;
+
+  if (hasAuction) {
+    renderHomeHub(el, hasData, hasSeasons);
+  } else {
+    renderHomeWelcome(el, hasData, hasSeasons);
   }
-  document.getElementById('view-welcome').style.display = '';
+}
+
+function renderHomeWelcome(el, hasData, hasSeasons) {
+  const hasAuction = !!currentAuction;
+  const auctionsList = (allAuctionsCache || []).map(a => `
+    <div class="hub-auction-item" onclick="loadAuction(${a.id})">
+      <div class="info"><strong>${a.name}</strong><span>${a.num_teams} sq · ${a.initial_credits}cr · ${a.mode}</span></div>
+      <div class="actions">
+        <button class="btn btn-sm" onclick="event.stopPropagation();loadAuction(${a.id})">Apri</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteAuction(${a.id},'${a.name.replace(/'/g,"\\'")}')">Elimina</button>
+      </div>
+    </div>`).join('');
+
   el.innerHTML = `
-    <h1>FantaWizard</h1>
-    <div class="welcome-sub">Il tuo assistente per l'asta del fantacalcio.<br>Segui questi passi per iniziare.</div>
-    <div class="welcome-steps">
-      <div class="welcome-step ${hasAuction?'done':''}" onclick="${hasAuction?'':'navigateTo(\'setup\')'}" style="${hasAuction?'':'cursor:pointer;'}">
-        <div class="welcome-step-num">${hasAuction?'&#10003;':'1'}</div>
-        <div class="welcome-step-text"><strong>Crea la tua asta</strong><span>Configura squadre, crediti, bonus e moduli</span></div>
+    <div class="welcome-screen">
+      <h1>FantaWizard</h1>
+      <div class="welcome-sub">Il tuo assistente per l'asta del fantacalcio.<br>Segui questi passi per iniziare.</div>
+      <div class="welcome-steps">
+        <div class="welcome-step ${hasAuction?'done':''}" onclick="${hasAuction?'':'navigateTo(\'setup\')'}" style="${hasAuction?'':'cursor:pointer;'}">
+          <div class="welcome-step-num">${hasAuction?'&#10003;':'1'}</div>
+          <div class="welcome-step-text"><strong>Crea la tua asta</strong><span>Configura squadre, crediti, bonus e moduli</span></div>
+        </div>
+        <div class="welcome-step ${hasData?'done':''}" onclick="${hasData?'':hasAuction?'navigateTo(\'data\')':''}" style="${!hasData&&hasAuction?'cursor:pointer;':''}">
+          <div class="welcome-step-num">${hasData?'&#10003;':'2'}</div>
+          <div class="welcome-step-text"><strong>Importa le quotazioni</strong><span>Carica il listone da Fantacalcio.it o Fantagazzetta</span></div>
+        </div>
+        <div class="welcome-step ${hasSeasons?'done':''}" onclick="${hasSeasons?'':hasAuction?'navigateTo(\'data\')':''}" style="${!hasSeasons&&hasAuction?'cursor:pointer;':''}">
+          <div class="welcome-step-num">${hasSeasons?'&#10003;':'3'}</div>
+          <div class="welcome-step-text"><strong>Importa le statistiche</strong><span>Almeno una stagione per le proiezioni FMA</span></div>
+        </div>
       </div>
-      <div class="welcome-step ${hasData?'done':''}" onclick="${hasData?'':hasAuction?'navigateTo(\'data\')':''}" style="${!hasData&&hasAuction?'cursor:pointer;':''}">
-        <div class="welcome-step-num">${hasData?'&#10003;':'2'}</div>
-        <div class="welcome-step-text"><strong>Importa le quotazioni</strong><span>Carica il listone da Fantacalcio.it o Fantagazzetta</span></div>
+      ${!hasAuction?'<button class="btn" onclick="navigateTo(\'setup\')" style="padding:12px 36px;font-size:1rem;">Inizia Setup</button>':''}
+      ${hasAuction&&!hasData?'<button class="btn" onclick="navigateTo(\'data\')" style="padding:12px 36px;font-size:1rem;">Importa dati</button>':''}
+    </div>
+    ${auctionsList ? `<div class="hub-auctions" style="max-width:540px;margin:0 auto;"><h3 style="font-size:.95rem;font-weight:700;margin-bottom:12px;">Le tue aste</h3>${auctionsList}</div>` : ''}`;
+}
+
+function renderHomeHub(el, hasData, hasSeasons) {
+  const name = auctionData?.name || 'Asta';
+  const credits = auctionData?.initial_credits || 500;
+  const nTeams = auctionData?.num_teams || 8;
+  const mode = auctionData?.mode || 'classic';
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+
+  const nPurchases = soldIds.size;
+  const nMyPurchases = userSoldIds.size;
+  const planTargets = Object.values(targetList).flat();
+  const nPlanTargets = planTargets.length;
+  const planSpend = planTargets.reduce((a,t) => a + (t.maxPrice||0), 0);
+
+  const needSetup = !hasData || !hasSeasons;
+
+  el.innerHTML = `
+    <div class="hub-header">
+      <div class="hub-header-icon">&#9889;</div>
+      <div class="hub-header-info">
+        <h2>${name}</h2>
+        <span>${nTeams} squadre · ${credits} crediti · ${mode} · ${totalSlots} slot</span>
       </div>
-      <div class="welcome-step ${hasSeasons?'done':''}" onclick="${hasSeasons?'':hasAuction?'navigateTo(\'data\')':''}" style="${!hasSeasons&&hasAuction?'cursor:pointer;':''}">
-        <div class="welcome-step-num">${hasSeasons?'&#10003;':'3'}</div>
-        <div class="welcome-step-text"><strong>Importa le statistiche</strong><span>Almeno una stagione per le proiezioni FMA</span></div>
+      <div class="hub-header-actions">
+        <button class="btn-ghost btn-sm" onclick="navigateTo('setup')" title="Impostazioni">&#9881; Settings</button>
+        <button class="btn-ghost btn-sm" style="color:var(--text3);" onclick="closeAuction()">Chiudi asta</button>
       </div>
     </div>
-    ${!hasAuction?'<button class="btn" onclick="navigateTo(\'setup\')" style="padding:12px 36px;font-size:1rem;">Inizia Setup</button>':''}
-    ${hasAuction&&!hasData?'<button class="btn" onclick="navigateTo(\'data\')" style="padding:12px 36px;font-size:1rem;">Importa dati</button>':''}
+
+    ${needSetup ? `
+    <div style="padding:14px 18px;background:rgba(243,156,18,.08);border:1px solid rgba(243,156,18,.3);border-radius:var(--radius);margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:1.2rem;">&#9888;</span>
+      <div style="font-size:.85rem;">
+        ${!hasData ? '<strong>Importa le quotazioni</strong> per sbloccare tutte le funzionalit&agrave;. ' : ''}
+        ${!hasSeasons ? '<strong>Importa le statistiche</strong> per le proiezioni FMA. ' : ''}
+        <a href="#" onclick="event.preventDefault();navigateTo('data')" style="color:var(--accent);font-weight:600;">Vai a Dati &rarr;</a>
+      </div>
+    </div>` : ''}
+
+    <div class="hub-stats-row">
+      <div class="hub-stat"><div class="val">${allPlayers.length}</div><div class="lbl">Giocatori</div></div>
+      <div class="hub-stat"><div class="val">${nPurchases}</div><div class="lbl">Acquisti totali</div></div>
+      <div class="hub-stat"><div class="val">${nMyPurchases}/${totalSlots}</div><div class="lbl">La mia rosa</div></div>
+      <div class="hub-stat"><div class="val">${nPlanTargets > 0 ? nPlanTargets : '-'}</div><div class="lbl">Target piano</div></div>
+      <div class="hub-stat"><div class="val">${nPlanTargets > 0 ? planSpend + 'cr' : '-'}</div><div class="lbl">Spesa piano</div></div>
+    </div>
+
+    <div class="hub-nav-grid">
+      <div class="hub-nav-card" onclick="navigateTo('plan')">
+        <div class="hub-card-icon" style="background:rgba(127,17,224,.12);color:#7f11e0;">&#127919;</div>
+        <div class="hub-card-text">
+          <strong>Piano Asta</strong>
+          <span>${nPlanTargets > 0 ? nPlanTargets + ' target, ' + planSpend + '/' + credits + 'cr' : 'Genera o personalizza il piano'}</span>
+        </div>
+      </div>
+      <div class="hub-nav-card" onclick="navigateTo('dashboard')">
+        <div class="hub-card-icon" style="background:rgba(47,197,238,.12);color:#2fc5ee;">&#9889;</div>
+        <div class="hub-card-text">
+          <strong>Asta Live</strong>
+          <span>${nPurchases > 0 ? nPurchases + ' acquisti registrati' : 'Cerca, chiama, compra'}</span>
+        </div>
+      </div>
+      <div class="hub-nav-card" onclick="navigateTo('teams')">
+        <div class="hub-card-icon" style="background:rgba(46,204,113,.12);color:#2ecc71;">&#128101;</div>
+        <div class="hub-card-text">
+          <strong>Rose</strong>
+          <span>${nMyPurchases > 0 ? nMyPurchases + ' giocatori acquistati' : 'Visualizza le rose delle squadre'}</span>
+        </div>
+      </div>
+      <div class="hub-nav-card" onclick="navigateTo('tiers')">
+        <div class="hub-card-icon" style="background:rgba(243,156,18,.12);color:#f39c12;">&#9776;</div>
+        <div class="hub-card-text">
+          <strong>Tier List</strong>
+          <span>Classifica giocatori per ruolo e valore</span>
+        </div>
+      </div>
+      <div class="hub-nav-card" onclick="navigateTo('players')">
+        <div class="hub-card-icon" style="background:rgba(231,76,60,.12);color:#e74c3c;">&#9917;</div>
+        <div class="hub-card-text">
+          <strong>Giocatori</strong>
+          <span>${allPlayers.length} giocatori · statistiche e proiezioni</span>
+        </div>
+      </div>
+      <div class="hub-nav-card" onclick="navigateTo('data')">
+        <div class="hub-card-icon" style="background:rgba(155,89,182,.12);color:#9b59b6;">&#128194;</div>
+        <div class="hub-card-text">
+          <strong>Dati</strong>
+          <span>Importa quotazioni e statistiche</span>
+        </div>
+      </div>
+    </div>
+
+    ${allAuctionsCache.length > 1 ? `
+    <div class="hub-auctions">
+      <h3 style="font-size:.9rem;font-weight:700;margin-bottom:10px;color:var(--text2);">Altre aste</h3>
+      ${allAuctionsCache.filter(a => a.id !== currentAuction).map(a => `
+        <div class="hub-auction-item" onclick="loadAuction(${a.id})">
+          <div class="info"><strong>${a.name}</strong><span>${a.num_teams} sq · ${a.initial_credits}cr</span></div>
+          <div class="actions"><button class="btn btn-sm" onclick="event.stopPropagation();loadAuction(${a.id})">Apri</button></div>
+        </div>`).join('')}
+    </div>` : ''}
   `;
 }
 
 function checkFirstRun() {
+  renderHome();
   const hasData = allPlayers.length > 0;
   const hasAuction = !!currentAuction;
   if (!hasData && !hasAuction) {
-    renderWelcome();
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById('view-welcome').classList.add('active');
-    document.getElementById('topbar-title').textContent = 'Benvenuto';
+    document.getElementById('view-home').classList.add('active');
+    document.getElementById('topbar-title').textContent = 'Home';
     document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+    const homeBtn = document.querySelector('#nav button[data-view="home"]');
+    if (homeBtn) homeBtn.classList.add('active');
   }
 }
 
@@ -4110,7 +4285,7 @@ loadExistingAuctions();
     await loadAllData();
   } finally { hideLoading(); }
   updateNavState();
-  renderWelcome();
+  renderHome();
   checkFirstRun();
 })();
 </script>
