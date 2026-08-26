@@ -4189,7 +4189,7 @@ async function openPlayer(id) {
       mateStats.sort((a, b) => b.apps - a.apps);
       return `<div style="margin-top:14px;">
         <h4 style="margin-bottom:4px;font-family:var(--font-display);font-size:1rem;letter-spacing:.04em;text-transform:uppercase;">Ballottaggi ${pl.team} · ${pl.role_classic}</h4>
-        <div style="font-size:.7rem;color:var(--text3);margin-bottom:8px;">Solo dati stagione scorsa · <span style="color:var(--yellow);">parziale</span> = &lt;19 pres · <span style="color:var(--red);">N/D</span> = nessun dato in Serie A</div>
+        <div style="font-size:.7rem;color:var(--text3);margin-bottom:8px;">% presenze su 38 giornate stagione scorsa · <span style="color:var(--yellow);">parziale</span> &lt;19 pres · <span style="color:var(--red);">N/D</span> nessun dato in Serie A</div>
         <div style="display:flex;flex-direction:column;gap:4px;">
         ${mateStats.map(m => {
           const shareRep = totalApps > 0 ? Math.round(m.apps / totalApps * 100) : 0;
@@ -4203,19 +4203,19 @@ async function openPlayer(id) {
           const soldHtml = m.isSold && !m.isCurrent ? ' <span style="color:var(--red);font-size:.65rem;font-weight:700;">VENDUTO</span>' : '';
           const detailLine = m.noData
             ? '<span style="color:var(--red);">Nessun dato stagione scorsa</span>'
-            : `${m.apps} pres · MV ${m.mv || '-'} · FM ${m.fm || '-'}${m.gPlusA ? ' · ' + m.gPlusA + ' G+A' : ''}`;
+            : `${m.apps}/38 · MV ${m.mv || '-'} · FM ${m.fm || '-'}${m.gPlusA ? ' · ' + m.gPlusA + ' G+A' : ''}`;
           return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${bg};border:${border};border-radius:var(--radius-sm);font-size:.78rem;${m.isCurrent?'':'cursor:pointer;'}" ${m.isCurrent?'':`onclick="openPlayer(${m.p.id})"`}>
             <span class="price-tag t${m.tier}" style="font-size:.62rem;padding:1px 6px;">F${m.tier}</span>
             <span style="flex:1;min-width:0;">
               ${nameHtml}${badge}${soldHtml}
               <span style="display:block;font-size:.68rem;color:var(--text3);margin-top:2px;">${detailLine}</span>
             </span>
-            <span style="text-align:right;min-width:140px;">
-              <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;" title="Quota presenze del reparto (stagione scorsa)">
-                <div style="width:60px;height:5px;background:var(--bg);border-radius:3px;overflow:hidden;"><div style="width:${shareRep}%;height:100%;background:var(--accent);"></div></div>
-                <span style="font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;min-width:36px;text-align:right;">${shareRep}%</span>
+            <span style="text-align:right;min-width:150px;">
+              ${m.noData ? '' : `<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;" title="Presenze giocate su 38 giornate della stagione scorsa">
+                <div style="width:70px;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;"><div style="width:${m.seasonPct}%;height:100%;background:${seasClr};"></div></div>
+                <span style="font-weight:700;color:${seasClr};font-variant-numeric:tabular-nums;min-width:42px;text-align:right;">${m.seasonPct}%</span>
               </div>
-              ${m.noData ? '' : `<div style="font-size:.68rem;color:${seasClr};font-weight:700;margin-top:2px;" title="Presenze su 38 giornate">${m.seasonPct}% stag</div>`}
+              <div style="font-size:.68rem;color:var(--text3);margin-top:2px;" title="Quota % delle presenze del reparto (stagione scorsa)">${shareRep}% del reparto</div>`}
             </span>
           </div>`;
         }).join('')}
@@ -4260,7 +4260,7 @@ async function openPlayer(id) {
             <span style="flex:1;min-width:0;">
               <span style="font-weight:600;">${sp.name}</span> <span class="price-tag t${sTier}" style="font-size:.62rem;padding:1px 6px;vertical-align:middle;margin-left:2px;">${sp.role_classic}</span> <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isNoData?' <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(231,76,60,.15);color:var(--red);font-weight:700;" title="Nessun dato in Serie A la stagione scorsa">N/D</span>':isPartial?' <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto">parziale</span>':''}${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}
               <span style="display:flex;gap:10px;margin-top:3px;font-size:.72rem;color:var(--text3);">
-                ${isNoData ? '<span style="color:var(--red);">Nessun dato stagione scorsa</span>' : `<span title="Presenze ultima stagione / 38 giornate">${apps} pres (${seasonPct}%)</span><span title="Quota presenze del reparto ${sp.role_classic} in ${sp.team}">${shareRep}% reparto</span>`}
+                ${isNoData ? '<span style="color:var(--red);">Nessun dato stagione scorsa</span>' : `<span title="Presenze ultima stagione / 38 giornate">${apps}/38 (${seasonPct}%)</span><span title="Quota % presenze del reparto ${sp.role_classic} in ${sp.team}">${shareRep}% del reparto</span>`}
                 <span title="Compagni di reparto liberi">${teamAlts.length} ballott${teamAlts.length ? ': ' + teamAlts.map(a => a.name).slice(0,2).join(', ') + (teamAlts.length > 2 ? '...' : '') : ''}</span>
               </span>
             </span>
