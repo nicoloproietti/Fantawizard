@@ -3941,13 +3941,14 @@ function radarChart(stats, size = 140) {
   return `<svg viewBox="0 0 ${full} ${full}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:${size}px;">${svg}</svg>`;
 }
 
-function playerRadarStats(player, seasonMap) {
+function playerRadarStats(player, seasonMap, targetSeason) {
   const ss = seasonMap[player.id] || [];
-  const apps = Math.round(weightedStat(ss, 'appearances'));
-  const fm = parseFloat(projectFMA(player, ss)) || 0;
-  const goals = Math.round(weightedStat(ss, 'goals') * 10) / 10;
-  const assists = Math.round(weightedStat(ss, 'assists') * 10) / 10;
-  const bpm = computeBonusPerMatch(ss, player.role_classic);
+  const recent = targetSeason ? (ss.find(s => s.season === targetSeason) || null) : (ss[0] || null);
+  const apps = recent ? (recent.appearances || 0) : 0;
+  const fm = recent ? (recent.fanta_avg || 0) : 0;
+  const goals = recent ? (recent.goals || 0) : 0;
+  const assists = recent ? (recent.assists || 0) : 0;
+  const bpm = recent ? computeBonusPerMatch([recent], player.role_classic) : [];
   const bonus = Math.round(bpm.reduce((a, b) => a + b.impact, 0) * 100) / 100;
   const isGK = player.role_classic === 'P';
   const maxApps = 38;
@@ -4001,6 +4002,7 @@ async function openPlayer(id) {
   document.getElementById('player-modal').classList.add('open');
   const seasonMap = buildSeasonMap();
   const ss = seasonMap[pl.id] || [];
+  const latestSeason = allSeasons.reduce((max, s) => s.season > max ? s.season : max, '');
   if (pl.role_classic === 'P') {
     for (const s of ss) {
       if (!(s.clean_sheets > 0) && (s.appearances || 0) >= 1) {
@@ -4105,7 +4107,7 @@ async function openPlayer(id) {
     ${statsGridHtml}
     ${purchaseHtml}
     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
-      <div style="flex:0 0 auto;">${radarChart(playerRadarStats(pl, seasonMap), 160)}</div>
+      <div style="flex:0 0 auto;">${radarChart(playerRadarStats(pl, seasonMap, latestSeason), 160)}</div>
       <div style="flex:1;min-width:200px;">${gaugeHtml}</div>
     </div>
     <div class="chart-row">
@@ -4170,42 +4172,50 @@ async function openPlayer(id) {
       if (teamMates.length <= 1) return '';
       const mateStats = teamMates.map(m => {
         const ms = seasonMap[m.id] || [];
-        const recent = ms[0];
+        const recent = ms.find(s => s.season === latestSeason) || null;
         const apps = recent ? (recent.appearances || 0) : 0;
         const seasonPct = Math.min(100, Math.round(apps / 38 * 100));
         const partial = apps > 0 && apps < 19;
-        const fma = projectFMA(m, ms);
+        const noData = !recent || apps === 0;
+        const fm = recent ? (recent.fanta_avg || 0) : 0;
+        const mv = recent ? (recent.avg_rating || 0) : 0;
+        const gPlusA = recent ? ((recent.goals || 0) + (recent.assists || 0)) : 0;
         const tier = getPlayerTier(m.id, m.role_classic, tierData);
         const isSold = soldIds.has(m.id);
         const isCurrent = m.id === pl.id;
-        return {p: m, apps, seasonPct, partial, fma, tier, isSold, isCurrent};
+        return {p: m, apps, seasonPct, partial, noData, fm, mv, gPlusA, tier, isSold, isCurrent};
       });
       const totalApps = mateStats.reduce((a, m) => a + m.apps, 0);
       mateStats.sort((a, b) => b.apps - a.apps);
       return `<div style="margin-top:14px;">
         <h4 style="margin-bottom:4px;font-family:var(--font-display);font-size:1rem;letter-spacing:.04em;text-transform:uppercase;">Ballottaggi ${pl.team} · ${pl.role_classic}</h4>
-        <div style="font-size:.7rem;color:var(--text3);margin-bottom:8px;">Compagni di reparto ordinati per presenze stagione scorsa · <span style="color:var(--yellow);">badge parziale</span> = &lt;19 pres (infortunio, mercato o subentrante)</div>
+        <div style="font-size:.7rem;color:var(--text3);margin-bottom:8px;">Solo dati stagione scorsa · <span style="color:var(--yellow);">parziale</span> = &lt;19 pres · <span style="color:var(--red);">N/D</span> = nessun dato in Serie A</div>
         <div style="display:flex;flex-direction:column;gap:4px;">
         ${mateStats.map(m => {
           const shareRep = totalApps > 0 ? Math.round(m.apps / totalApps * 100) : 0;
           const seasClr = m.seasonPct >= 70 ? 'var(--green)' : m.seasonPct >= 40 ? 'var(--yellow)' : 'var(--red)';
           const bg = m.isCurrent ? 'var(--accent-dim)' : 'var(--bg3)';
           const border = m.isCurrent ? '1px solid var(--accent)' : '1px solid transparent';
-          const partialBadge = m.partial ? ` <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto — arrivo a mercato invernale, infortunio o ruolo di subentrante">parziale</span>` : '';
+          let badge = '';
+          if (m.noData) badge = ` <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(231,76,60,.15);color:var(--red);font-weight:700;" title="Nessun dato in Serie A la stagione scorsa: nuovo acquisto, di ritorno da prestito o dalla Primavera">N/D</span>`;
+          else if (m.partial) badge = ` <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto — arrivo a mercato invernale, infortunio o ruolo di subentrante">parziale</span>`;
           const nameHtml = m.isCurrent ? `<strong style="color:var(--accent);">${m.p.name}</strong>` : m.p.name;
           const soldHtml = m.isSold && !m.isCurrent ? ' <span style="color:var(--red);font-size:.65rem;font-weight:700;">VENDUTO</span>' : '';
+          const detailLine = m.noData
+            ? '<span style="color:var(--red);">Nessun dato stagione scorsa</span>'
+            : `${m.apps} pres · MV ${m.mv || '-'} · FM ${m.fm || '-'}${m.gPlusA ? ' · ' + m.gPlusA + ' G+A' : ''}`;
           return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${bg};border:${border};border-radius:var(--radius-sm);font-size:.78rem;${m.isCurrent?'':'cursor:pointer;'}" ${m.isCurrent?'':`onclick="openPlayer(${m.p.id})"`}>
             <span class="price-tag t${m.tier}" style="font-size:.62rem;padding:1px 6px;">F${m.tier}</span>
             <span style="flex:1;min-width:0;">
-              ${nameHtml}${partialBadge}${soldHtml}
-              <span style="display:block;font-size:.68rem;color:var(--text3);margin-top:2px;">${m.apps} pres · FMA ${m.fma}</span>
+              ${nameHtml}${badge}${soldHtml}
+              <span style="display:block;font-size:.68rem;color:var(--text3);margin-top:2px;">${detailLine}</span>
             </span>
             <span style="text-align:right;min-width:140px;">
-              <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;" title="Quota presenze del reparto">
+              <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;" title="Quota presenze del reparto (stagione scorsa)">
                 <div style="width:60px;height:5px;background:var(--bg);border-radius:3px;overflow:hidden;"><div style="width:${shareRep}%;height:100%;background:var(--accent);"></div></div>
                 <span style="font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;min-width:36px;text-align:right;">${shareRep}%</span>
               </div>
-              <div style="font-size:.68rem;color:${seasClr};font-weight:700;margin-top:2px;" title="Presenze su 38 giornate">${m.seasonPct}% stag</div>
+              ${m.noData ? '' : `<div style="font-size:.68rem;color:${seasClr};font-weight:700;margin-top:2px;" title="Presenze su 38 giornate">${m.seasonPct}% stag</div>`}
             </span>
           </div>`;
         }).join('')}
@@ -4235,22 +4245,22 @@ async function openPlayer(id) {
           const sRec = recommendedPrice(sBp, sp.role_classic, sTier, infl, sSc, 999, sMkt);
           const simPct = Math.round(s.similarity * 100);
           const isSold = soldIds.has(sp.id);
-          const recentSeason = sss.length ? sss[0] : null;
+          const recentSeason = sss.find(s => s.season === latestSeason) || null;
           const apps = recentSeason ? (recentSeason.appearances || 0) : 0;
           const seasonPct = Math.min(100, Math.round(apps / 38 * 100));
           const isPartial = apps > 0 && apps < 19;
+          const isNoData = !recentSeason || apps === 0;
           const teamRepAll = allPlayers.filter(p => p.team === sp.team && p.role_classic === sp.role_classic && p.active);
-          const teamRepApps = teamRepAll.reduce((a, tp) => { const ts = seasonMap[tp.id] || []; return a + (ts[0] ? (ts[0].appearances || 0) : 0); }, 0);
+          const teamRepApps = teamRepAll.reduce((a, tp) => { const ts = seasonMap[tp.id] || []; const tr = ts.find(x => x.season === latestSeason); return a + (tr ? (tr.appearances || 0) : 0); }, 0);
           const shareRep = teamRepApps > 0 ? Math.round(apps / teamRepApps * 100) : 0;
           const teamAlts = teamRepAll.filter(p => p.id !== sp.id && !soldIds.has(p.id));
-          const miniRadar = radarChart(playerRadarStats(sp, seasonMap), 90);
+          const miniRadar = radarChart(playerRadarStats(sp, seasonMap, latestSeason), 90);
           return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm);cursor:pointer;transition:background .1s;${isSold?'opacity:.4;':''}font-size:.82rem;" onclick="openPlayer(${sp.id})" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">
             <div style="flex:0 0 90px;">${miniRadar}</div>
             <span style="flex:1;min-width:0;">
-              <span style="font-weight:600;">${sp.name}</span> <span class="price-tag t${sTier}" style="font-size:.62rem;padding:1px 6px;vertical-align:middle;margin-left:2px;">${sp.role_classic}</span> <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isPartial?' <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto">parziale</span>':''}${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}
+              <span style="font-weight:600;">${sp.name}</span> <span class="price-tag t${sTier}" style="font-size:.62rem;padding:1px 6px;vertical-align:middle;margin-left:2px;">${sp.role_classic}</span> <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isNoData?' <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(231,76,60,.15);color:var(--red);font-weight:700;" title="Nessun dato in Serie A la stagione scorsa">N/D</span>':isPartial?' <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto">parziale</span>':''}${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}
               <span style="display:flex;gap:10px;margin-top:3px;font-size:.72rem;color:var(--text3);">
-                <span title="Presenze ultima stagione / 38 giornate">${apps} pres (${seasonPct}%)</span>
-                <span title="Quota presenze del reparto ${sp.role_classic} in ${sp.team}">${shareRep}% reparto</span>
+                ${isNoData ? '<span style="color:var(--red);">Nessun dato stagione scorsa</span>' : `<span title="Presenze ultima stagione / 38 giornate">${apps} pres (${seasonPct}%)</span><span title="Quota presenze del reparto ${sp.role_classic} in ${sp.team}">${shareRep}% reparto</span>`}
                 <span title="Compagni di reparto liberi">${teamAlts.length} ballott${teamAlts.length ? ': ' + teamAlts.map(a => a.name).slice(0,2).join(', ') + (teamAlts.length > 2 ? '...' : '') : ''}</span>
               </span>
             </span>
