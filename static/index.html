@@ -833,6 +833,30 @@ a { color: var(--accent2); text-decoration: none; }
 .compare-bar-right { height:6px; border-radius:0 3px 3px 0; transition:width .3s; }
 @media(max-width:600px){ .compare-grid{grid-template-columns:1fr;} .compare-col-mid{flex-direction:row;flex-wrap:wrap;gap:6px;} .compare-mid-lbl{padding:2px 4px;} }
 
+/* ── Piano B Alert ── */
+.pianob-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9000; background:var(--bg2); border:1px solid var(--yellow); border-radius:var(--radius); padding:14px 18px; box-shadow:0 8px 32px rgba(0,0,0,.4); max-width:480px; width:calc(100% - 40px); animation:slideUp .3s ease-out; }
+.pianob-toast .pianob-header { display:flex; align-items:center; gap:8px; font-size:.88rem; font-weight:700; color:var(--yellow); margin-bottom:8px; }
+.pianob-toast .pianob-body { font-size:.82rem; color:var(--text2); line-height:1.5; }
+.pianob-toast .pianob-alt { display:flex; justify-content:space-between; align-items:center; padding:6px 8px; margin-top:6px; background:var(--bg3); border-radius:var(--radius-sm); cursor:pointer; transition:background .12s; }
+.pianob-toast .pianob-alt:hover { background:var(--bg4); }
+.pianob-toast .pianob-actions { display:flex; gap:8px; margin-top:10px; justify-content:flex-end; }
+@keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+
+/* ── Rigoristi Panel ── */
+.rig-panel { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-top:16px; }
+.rig-panel h3 { font-family:var(--font-display); font-size:1rem; font-weight:400; color:var(--text2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+.rig-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.rig-table th { text-align:left; padding:6px 8px; font-size:.72rem; text-transform:uppercase; color:var(--text3); letter-spacing:.04em; border-bottom:1px solid var(--border); }
+.rig-table th.num { text-align:right; }
+.rig-table td { padding:6px 8px; border-bottom:1px solid var(--border); }
+.rig-table tr:hover td { background:var(--bg3); }
+.rig-table tr { cursor:pointer; }
+.rig-table .num { text-align:right; font-variant-numeric:tabular-nums; }
+.rig-rate-bar { display:inline-block; height:6px; border-radius:3px; vertical-align:middle; margin-right:4px; }
+.rig-avail { font-size:.68rem; font-weight:700; padding:1px 6px; border-radius:8px; }
+.rig-avail.free { background:rgba(46,204,113,.12); color:var(--green); }
+.rig-avail.sold { background:rgba(231,76,60,.12); color:var(--red); }
+
 /* ── Responsive: sidebar persistent on desktop ── */
 @media(min-width:901px) {
   .sidebar { transform:translateX(0); }
@@ -1135,6 +1159,12 @@ a { color: var(--accent2); text-decoration: none; }
     <h3>&#128200; Report Compartimento Stagno</h3>
     <div class="phase-tabs" id="phase-tabs"></div>
     <div id="phase-content"></div>
+  </div>
+
+  <!-- Rigoristi Panel -->
+  <div class="rig-panel" id="rig-panel" style="display:none;">
+    <h3 onclick="toggleRigPanel()"><span>&#9917; Rigoristi</span> <span id="rig-toggle" style="font-size:.7rem;color:var(--text3);">&#9660;</span></h3>
+    <div id="rig-content"></div>
   </div>
 </div>
 </div>
@@ -2237,6 +2267,80 @@ function renderSupplyDemand(allPurch) {
   contentEl.innerHTML = html;
 }
 
+// ── Piano B: Auto-replacement for sold targets ──
+let _lastSoldTargetCheck = new Set();
+
+function checkSoldTargets() {
+  const allTargets = Object.entries(targetList).flatMap(([role, tgts]) => tgts.map(t => ({...t, role})));
+  if (!allTargets.length) return;
+
+  const newlySold = allTargets.filter(t => soldIds.has(t.playerId) && !userSoldIds.has(t.playerId) && !_lastSoldTargetCheck.has(t.playerId));
+  if (!newlySold.length) return;
+
+  for (const t of newlySold) _lastSoldTargetCheck.add(t.playerId);
+
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+
+  for (const sold of newlySold) {
+    const pl = allPlayers.find(p => p.id === sold.playerId);
+    if (!pl) continue;
+    const alts = findEquivalents(sold.playerId, seasonMap, tierData).slice(0, 3);
+    showPianoBToast(pl, sold.role, alts, seasonMap, tierData);
+  }
+}
+
+function showPianoBToast(soldPlayer, role, alts, seasonMap, tierData) {
+  const existing = document.querySelector('.pianob-toast');
+  if (existing) existing.remove();
+
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+
+  let altsHtml = '';
+  for (const alt of alts) {
+    const ap = alt.player;
+    const ass = seasonMap[ap.id] || [];
+    const afma = projectFMA(ap, ass);
+    const at = getPlayerTier(ap.id, ap.role_classic, tierData);
+    const art = tierData[ap.role_classic] || {};
+    const aptd = (art[at]||[]).find(tp => tp.id === ap.id);
+    const aAdj = aptd ? aptd.adjFma : afma;
+    const abp = basePrice(aAdj, role, credits, numTeams, totalSlots);
+    const asc = computeScarcity(at, art);
+    const amkt = scaleMarketPrice(ap.avg_auction_price, credits);
+    const arec = recommendedPrice(abp, role, at, {}, asc, 999, amkt);
+    const simPct = Math.round(alt.similarity * 100);
+    altsHtml += `<div class="pianob-alt" onclick="swapTarget('${role}',${soldPlayer.id},${ap.id},${Math.round(arec*1.2)});closePianoBToast();renderPlan();toast('${ap.name} aggiunto al piano!','success');">
+      <span><strong>${ap.name}</strong> <span style="color:var(--text3);">${ap.team} · F${at}</span></span>
+      <span style="font-variant-numeric:tabular-nums;">${aAdj} FMA · ~${arec}cr · <span style="color:var(--accent);">${simPct}%</span></span>
+    </div>`;
+  }
+
+  const div = document.createElement('div');
+  div.className = 'pianob-toast';
+  div.innerHTML = `
+    <div class="pianob-header">&#128260; Piano B — ${soldPlayer.name} venduto!</div>
+    <div class="pianob-body">
+      <strong>${soldPlayer.name}</strong> (${soldPlayer.team}) era nel tuo piano per il ruolo <strong>${role}</strong>.
+      ${alts.length ? 'Ecco le migliori alternative disponibili — clicca per sostituire:' : 'Non ci sono alternative simili disponibili.'}
+    </div>
+    ${altsHtml}
+    <div class="pianob-actions">
+      <button class="btn-ghost btn-sm" onclick="closePianoBToast()">Chiudi</button>
+      ${alts.length ? `<button class="btn btn-sm" onclick="navigateTo('plan');closePianoBToast();">Vai al Piano</button>` : ''}
+    </div>`;
+  document.body.appendChild(div);
+
+  setTimeout(() => { if (div.parentNode) div.remove(); }, 15000);
+}
+
+function closePianoBToast() {
+  const el = document.querySelector('.pianob-toast');
+  if (el) el.remove();
+}
+
 // ── Analytics Widgets ──
 const ROLE_COLORS = {P:'#9b59b6', D:'#2fc5ee', C:'#2ecc71', A:'#e74c3c'};
 const ROLE_ORDER = ['P','D','C','A'];
@@ -2259,6 +2363,7 @@ async function renderAnalytics() {
   renderSlotsMatrix(allPurch);
   renderTeamPlayers(allPurch);
   renderPhaseReport(allPurch);
+  renderRigoristiPanel(seasonMap, tierData);
 }
 
 function renderCreditsChart(allPurch) {
@@ -2596,6 +2701,114 @@ function renderPhaseContent(allPurch, role) {
     </div>`;
   }
   el.innerHTML = html;
+}
+
+// ── Rigoristi Panel ──
+let _rigOpen = true;
+
+function toggleRigPanel() {
+  _rigOpen = !_rigOpen;
+  document.getElementById('rig-content').style.display = _rigOpen ? '' : 'none';
+  document.getElementById('rig-toggle').innerHTML = _rigOpen ? '&#9660;' : '&#9654;';
+}
+
+function renderRigoristiPanel(seasonMap, tierData) {
+  const el = document.getElementById('rig-panel');
+  const contentEl = document.getElementById('rig-content');
+  if (!allPlayers.length || !allSeasons.length) { el.style.display = 'none'; return; }
+
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+
+  const penData = {};
+  for (const s of allSeasons) {
+    const taken = s.penalties_taken || 0;
+    const scored = s.penalties_scored || 0;
+    if (taken === 0 && scored === 0) continue;
+    if (!penData[s.player_id]) penData[s.player_id] = {taken:0, scored:0, seasons:0, recentTaken:0};
+    penData[s.player_id].taken += taken;
+    penData[s.player_id].scored += scored;
+    penData[s.player_id].seasons++;
+    const seasonYear = parseInt(s.season) || 0;
+    if (seasonYear >= 2023) penData[s.player_id].recentTaken += taken;
+  }
+
+  const rows = [];
+  for (const [pidStr, data] of Object.entries(penData)) {
+    const pid = parseInt(pidStr);
+    const pl = allPlayers.find(p => p.id === pid);
+    if (!pl || !pl.active) continue;
+    if (data.taken < 2) continue;
+    const rate = data.taken > 0 ? data.scored / data.taken : 0;
+    const perSeason = data.seasons > 0 ? data.taken / data.seasons : 0;
+    const isSold = soldIds.has(pid);
+    const isTarget = Object.values(targetList).flat().some(t => t.playerId === pid);
+
+    const tier = getPlayerTier(pid, pl.role_classic, tierData);
+    const rt = tierData[pl.role_classic] || {};
+    const tl = (rt[tier]||[]).find(tp => tp.id === pid);
+    const adjFma = tl ? tl.adjFma : projectFMA(pl, seasonMap[pid]||[]);
+    const bp = basePrice(adjFma, pl.role_classic, credits, numTeams, totalSlots);
+    const scarcity = computeScarcity(tier, rt);
+    const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
+    const rec = recommendedPrice(bp, pl.role_classic, tier, {}, scarcity, 999, mkt);
+
+    rows.push({
+      id: pid, name: pl.name, team: pl.team, role: pl.role_classic,
+      taken: data.taken, scored: data.scored, rate, perSeason, recentTaken: data.recentTaken,
+      tier, adjFma, rec, isSold, isTarget, isPenaltyTaker: pl.is_penalty_taker,
+    });
+  }
+
+  rows.sort((a,b) => b.recentTaken - a.recentTaken || b.perSeason - a.perSeason || b.taken - a.taken);
+
+  if (!rows.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+
+  const freePenalty = rows.filter(r => !r.isSold);
+  const summary = `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;font-size:.78rem;color:var(--text2);">
+    <span>Rigoristi in lista: <strong style="color:var(--text);">${rows.length}</strong></span>
+    <span>Disponibili: <strong style="color:var(--green);">${freePenalty.length}</strong></span>
+    <span>Venduti: <strong style="color:var(--red);">${rows.length - freePenalty.length}</strong></span>
+  </div>`;
+
+  let tableHtml = `<table class="rig-table">
+    <thead><tr>
+      <th>Giocatore</th><th>Squadra</th><th>Ruolo</th>
+      <th class="num">Rig/stag</th><th class="num">Totali</th>
+      <th class="num">Conv. %</th><th class="num">FMA adj</th>
+      <th class="num">Prezzo</th><th>Stato</th>
+    </tr></thead><tbody>`;
+
+  for (const r of rows.slice(0, 30)) {
+    const ratePct = Math.round(r.rate * 100);
+    const rateClr = ratePct >= 85 ? 'var(--green)' : ratePct >= 70 ? 'var(--yellow)' : 'var(--red)';
+    const barW = Math.min(ratePct, 100);
+    const statusHtml = r.isSold
+      ? '<span class="rig-avail sold">Venduto</span>'
+      : r.isTarget
+        ? '<span class="rig-avail free" style="background:rgba(100,100,255,.12);color:var(--accent);">Target</span>'
+        : '<span class="rig-avail free">Libero</span>';
+    const rowCls = r.isSold ? ' style="opacity:.5;"' : '';
+    const pkBadge = r.isPenaltyTaker ? ' <span style="color:var(--yellow);" title="Rigorista designato">&#9917;</span>' : '';
+
+    tableHtml += `<tr onclick="openPlayer(${r.id})"${rowCls}>
+      <td style="font-weight:600;">${r.name}${pkBadge}</td>
+      <td style="color:var(--text2);">${r.team}</td>
+      <td><span class="price-tag t${r.tier}" style="font-size:.7rem;padding:2px 8px;">${r.role}</span></td>
+      <td class="num" style="font-weight:700;">${r.perSeason.toFixed(1)}</td>
+      <td class="num">${r.scored}/${r.taken}</td>
+      <td class="num"><span class="rig-rate-bar" style="width:${barW * 0.5}px;background:${rateClr};"></span><span style="color:${rateClr};font-weight:700;">${ratePct}%</span></td>
+      <td class="num" style="font-weight:700;color:var(--accent);">${r.adjFma}</td>
+      <td class="num" style="color:var(--green);font-weight:700;">${r.rec}cr</td>
+      <td>${statusHtml}</td>
+    </tr>`;
+  }
+  tableHtml += '</tbody></table>';
+
+  contentEl.innerHTML = summary + tableHtml;
+  contentEl.style.display = _rigOpen ? '' : 'none';
 }
 
 // ── Player Comparison with Top of Role ──
@@ -3960,6 +4173,7 @@ async function refreshPurchases() {
   soldIds = new Set((purchases||[]).map(p => p.player_id));
   const userTeam = teamsCache.find(t => t.is_user);
   userSoldIds = new Set((purchases||[]).filter(p => p.team_id === userTeam?.id).map(p => p.player_id));
+  checkSoldTargets();
   document.getElementById('purchases-log').innerHTML = (purchases||[]).map(p => `
     <tr>
       <td><strong>${p.players?.name||'?'}</strong></td>
