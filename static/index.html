@@ -4227,8 +4227,16 @@ async function openPlayer(id) {
       const similars = findSimilarPlayers(pl.id, seasonMap, tierData, 3);
       if (!similars.length) return '';
       return `<div style="margin-top:14px;">
-        <h4 style="margin-bottom:8px;font-family:var(--font-display);font-size:1rem;letter-spacing:.04em;text-transform:uppercase;">Alternative</h4>
-        <div style="display:flex;flex-direction:column;gap:6px;">
+        <h4 style="margin-bottom:4px;font-family:var(--font-display);font-size:1rem;letter-spacing:.04em;text-transform:uppercase;">Alternative</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:.68rem;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--radius-sm);">
+          <span style="color:var(--text2);font-weight:700;">Radar (stagione scorsa):</span>
+          <span><span style="color:var(--text);font-weight:700;">Pres</span> presenze / 38</span>
+          <span><span style="color:var(--text);font-weight:700;">FM</span> fantamedia</span>
+          <span><span style="color:var(--text);font-weight:700;">Bonus</span> impatto bonus/partita</span>
+          <span><span style="color:var(--text);font-weight:700;">Gol</span> gol</span>
+          <span><span style="color:var(--text);font-weight:700;">Assist</span> assist</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
         ${similars.map(s => {
           const sp = s.player;
           const sss = seasonMap[sp.id] || [];
@@ -4245,31 +4253,58 @@ async function openPlayer(id) {
           const sRec = recommendedPrice(sBp, sp.role_classic, sTier, infl, sSc, 999, sMkt);
           const simPct = Math.round(s.similarity * 100);
           const isSold = soldIds.has(sp.id);
-          const recentSeason = sss.find(s => s.season === latestSeason) || null;
+          const recentSeason = sss.find(x => x.season === latestSeason) || null;
           const apps = recentSeason ? (recentSeason.appearances || 0) : 0;
           const seasonPct = Math.min(100, Math.round(apps / 38 * 100));
+          const seasClr = seasonPct >= 70 ? 'var(--green)' : seasonPct >= 40 ? 'var(--yellow)' : 'var(--red)';
           const isPartial = apps > 0 && apps < 19;
           const isNoData = !recentSeason || apps === 0;
           const teamRepAll = allPlayers.filter(p => p.team === sp.team && p.role_classic === sp.role_classic && p.active);
           const teamRepApps = teamRepAll.reduce((a, tp) => { const ts = seasonMap[tp.id] || []; const tr = ts.find(x => x.season === latestSeason); return a + (tr ? (tr.appearances || 0) : 0); }, 0);
           const shareRep = teamRepApps > 0 ? Math.round(apps / teamRepApps * 100) : 0;
           const teamAlts = teamRepAll.filter(p => p.id !== sp.id && !soldIds.has(p.id));
-          const miniRadar = radarChart(playerRadarStats(sp, seasonMap, latestSeason), 90);
-          return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm);cursor:pointer;transition:background .1s;${isSold?'opacity:.4;':''}font-size:.82rem;" onclick="openPlayer(${sp.id})" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">
-            <div style="flex:0 0 90px;">${miniRadar}</div>
-            <span style="flex:1;min-width:0;">
-              <span style="font-weight:600;">${sp.name}</span> <span class="price-tag t${sTier}" style="font-size:.62rem;padding:1px 6px;vertical-align:middle;margin-left:2px;">${sp.role_classic}</span> <span style="color:var(--text3);font-weight:400;">${sp.team}</span>${isNoData?' <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(231,76,60,.15);color:var(--red);font-weight:700;" title="Nessun dato in Serie A la stagione scorsa">N/D</span>':isPartial?' <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto">parziale</span>':''}${isSold?' <span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>':''}
-              <span style="display:flex;gap:10px;margin-top:3px;font-size:.72rem;color:var(--text3);">
-                ${isNoData ? '<span style="color:var(--red);">Nessun dato stagione scorsa</span>' : `<span title="Presenze ultima stagione / 38 giornate">${apps}/38 (${seasonPct}%)</span><span title="Quota % presenze del reparto ${sp.role_classic} in ${sp.team}">${shareRep}% del reparto</span>`}
-                <span title="Compagni di reparto liberi">${teamAlts.length} ballott${teamAlts.length ? ': ' + teamAlts.map(a => a.name).slice(0,2).join(', ') + (teamAlts.length > 2 ? '...' : '') : ''}</span>
-              </span>
-            </span>
-            <span style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">
-              <span style="color:var(--accent);font-weight:700;">${sAdj}</span>
-              <span style="color:${sRelClr};font-size:.72rem;margin-left:4px;">${sRel}%</span><br>
-              <span style="color:var(--green);font-weight:700;font-size:.78rem;">~${sRec}cr</span>
-              <span style="font-size:.65rem;padding:1px 5px;border-radius:3px;background:var(--accent-dim);color:var(--accent);font-weight:700;margin-left:4px;">${simPct}%</span>
-            </span>
+          const bigRadar = radarChart(playerRadarStats(sp, seasonMap, latestSeason), 170);
+          const badge = isNoData
+            ? '<span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(231,76,60,.15);color:var(--red);font-weight:700;" title="Nessun dato in Serie A la stagione scorsa">N/D</span>'
+            : isPartial ? '<span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto">parziale</span>' : '';
+          const soldBadge = isSold ? '<span style="color:var(--red);font-size:.7rem;font-weight:700;">VENDUTO</span>' : '';
+          return `<div style="display:flex;flex-direction:column;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:background .1s;${isSold?'opacity:.5;':''}" onclick="openPlayer(${sp.id})" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">
+            <div style="display:flex;align-items:start;justify-content:space-between;gap:6px;margin-bottom:6px;">
+              <div style="min-width:0;flex:1;">
+                <div style="font-weight:700;font-size:.9rem;">${sp.name}</div>
+                <div style="font-size:.68rem;color:var(--text3);margin-top:2px;"><span class="price-tag t${sTier}" style="font-size:.6rem;padding:1px 5px;">${sp.role_classic} F${sTier}</span> ${sp.team}</div>
+              </div>
+              <span style="font-size:.65rem;padding:2px 6px;border-radius:3px;background:var(--accent-dim);color:var(--accent);font-weight:700;flex-shrink:0;" title="Similarità con il giocatore corrente">${simPct}%</span>
+            </div>
+            <div style="display:flex;justify-content:center;margin:4px 0;">${bigRadar}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:6px 0 8px 0;font-size:.62rem;color:var(--text3);">
+              <span title="Presenze stagione"><span style="color:var(--text2);font-weight:600;">Pres</span> ${isNoData?'-':apps+'/38'}</span>
+              <span>·</span>
+              <span title="Fantamedia stagione"><span style="color:var(--text2);font-weight:600;">FM</span> ${recentSeason?.fanta_avg || '-'}</span>
+              <span>·</span>
+              <span title="Gol stagione"><span style="color:var(--text2);font-weight:600;">Gol</span> ${recentSeason?.goals || 0}</span>
+              <span>·</span>
+              <span title="Assist stagione"><span style="color:var(--text2);font-weight:600;">Ass</span> ${recentSeason?.assists || 0}</span>
+            </div>
+            ${(badge || soldBadge) ? `<div style="display:flex;gap:4px;justify-content:center;margin-bottom:6px;">${badge}${soldBadge}</div>` : ''}
+            <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:auto;display:flex;flex-direction:column;gap:4px;font-size:.72rem;">
+              ${isNoData ? '<div style="color:var(--red);text-align:center;">Nessun dato stagione scorsa</div>' : `
+              <div style="display:flex;align-items:center;gap:6px;" title="Presenze giocate su 38 giornate">
+                <span style="color:var(--text3);flex-shrink:0;min-width:70px;">Stagione</span>
+                <div style="flex:1;height:5px;background:var(--bg);border-radius:3px;overflow:hidden;"><div style="width:${seasonPct}%;height:100%;background:${seasClr};"></div></div>
+                <span style="font-weight:700;color:${seasClr};font-variant-numeric:tabular-nums;min-width:36px;text-align:right;">${seasonPct}%</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;" title="Quota % presenze del reparto ${sp.role_classic} in ${sp.team}">
+                <span style="color:var(--text3);flex-shrink:0;min-width:70px;">Reparto</span>
+                <div style="flex:1;height:5px;background:var(--bg);border-radius:3px;overflow:hidden;"><div style="width:${shareRep}%;height:100%;background:var(--accent);"></div></div>
+                <span style="font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;min-width:36px;text-align:right;">${shareRep}%</span>
+              </div>`}
+              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;">
+                <div style="font-size:.68rem;color:var(--text3);" title="FMA adjusted · Affidabilità">FMA <span style="color:var(--accent);font-weight:700;">${sAdj}</span> · <span style="color:${sRelClr};">${sRel}%</span></div>
+                <div style="font-size:.85rem;color:var(--green);font-weight:700;font-variant-numeric:tabular-nums;">~${sRec}cr</div>
+              </div>
+              ${teamAlts.length ? `<div style="font-size:.65rem;color:var(--text3);margin-top:2px;" title="Compagni di reparto ancora liberi">Ballottaggi (${teamAlts.length}): ${teamAlts.map(a => a.name).slice(0,3).join(', ')}${teamAlts.length > 3 ? '...' : ''}</div>` : ''}
+            </div>
           </div>`;
         }).join('')}
         </div>
