@@ -733,6 +733,34 @@ a { color: var(--accent2); text-decoration: none; }
 .opportunity-alert .opp-text { flex:1; line-height:1.4; }
 .opportunity-alert .opp-text strong { color:var(--yellow); }
 
+/* ── Live Teams Panel ── */
+.live-teams-panel { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:16px; }
+.live-teams-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:10px; }
+.lt-tab { background:var(--bg3); border:1px solid var(--border); color:var(--text2); padding:6px 12px; border-radius:var(--radius-sm); cursor:pointer; font-size:.78rem; font-weight:600; transition:all .12s; display:flex; align-items:center; gap:6px; }
+.lt-tab:hover { background:var(--bg4); color:var(--text); }
+.lt-tab.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.lt-tab.user { border-color:var(--accent); }
+.lt-tab.user::before { content:"\1F3E0"; }
+.lt-tab .lt-tab-cr { font-size:.7rem; color:var(--text3); font-weight:400; font-variant-numeric:tabular-nums; }
+.lt-tab.active .lt-tab-cr { color:var(--accent); }
+.lt-tab .lt-tab-count { font-size:.7rem; color:var(--text3); font-variant-numeric:tabular-nums; padding:1px 5px; background:var(--bg); border-radius:8px; }
+.live-teams-body { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+.lt-role-col { background:var(--bg3); border-radius:var(--radius-sm); padding:8px 10px; }
+.lt-role-col h4 { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; color:var(--text3); display:flex; justify-content:space-between; align-items:center; }
+.lt-role-col h4 .lt-role-cr { color:var(--accent); font-weight:700; }
+.lt-slot { display:flex; justify-content:space-between; align-items:center; padding:5px 6px; border-radius:4px; font-size:.78rem; transition:background .1s; }
+.lt-slot.filled { cursor:pointer; }
+.lt-slot.filled:hover { background:var(--bg4); }
+.lt-slot.empty { color:var(--text3); font-style:italic; background:rgba(74,90,117,.08); }
+.lt-slot-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:6px; }
+.lt-slot-team { color:var(--text3); font-size:.68rem; }
+.lt-slot-price { font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; flex-shrink:0; }
+.lt-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:.82rem; }
+.lt-header .lt-title { font-weight:700; font-size:.95rem; }
+.lt-header .lt-spent { color:var(--text2); font-variant-numeric:tabular-nums; }
+.lt-header .lt-spent strong { color:var(--accent); font-weight:700; }
+.lt-header .lt-remaining { color:var(--green); font-weight:700; font-variant-numeric:tabular-nums; }
+
 .strategy-panel { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
 @media(max-width:900px){ .strategy-panel{grid-template-columns:1fr;} }
 .strat-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
@@ -1093,6 +1121,12 @@ a { color: var(--accent2); text-decoration: none; }
   <div class="opportunity-alert" id="opp-alert">
     <span class="opp-icon">&#9889;</span>
     <div class="opp-text" id="opp-text"></div>
+  </div>
+
+  <!-- Live Teams Panel -->
+  <div class="live-teams-panel" id="live-teams-panel" style="display:none;">
+    <div class="live-teams-tabs" id="live-teams-tabs"></div>
+    <div class="live-teams-body" id="live-teams-body"></div>
   </div>
 
   <div class="dash-top">
@@ -2567,6 +2601,85 @@ function renderSlotsMatrix(allPurch) {
   }
   html += '</tbody></table></div>';
   el.innerHTML = html;
+}
+
+// ── Live Teams Panel: tabbed view of every team's roster during the auction ──
+let _liveTeamTabId = null;
+
+function showLiveTeam(teamId) {
+  _liveTeamTabId = teamId;
+  renderLiveTeams(_lastPurchases || []);
+}
+
+let _lastPurchases = null;
+function renderLiveTeams(allPurch) {
+  _lastPurchases = allPurch;
+  const panel = document.getElementById('live-teams-panel');
+  if (!panel || !currentAuction || !teamsCache.length) { if (panel) panel.style.display = 'none'; return; }
+  panel.style.display = '';
+
+  const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
+  const credits = auctionData?.initial_credits || 500;
+  const userTeam = teamsCache.find(t => t.is_user);
+  const teamPurch = {};
+  for (const t of teamsCache) teamPurch[t.id] = {team:t, purchases:[], spent:0};
+  for (const p of (allPurch||[])) {
+    if (teamPurch[p.team_id]) { teamPurch[p.team_id].purchases.push(p); teamPurch[p.team_id].spent += p.price; }
+  }
+
+  if (_liveTeamTabId === null || !teamPurch[_liveTeamTabId]) _liveTeamTabId = userTeam?.id ?? teamsCache[0]?.id;
+
+  const tabsEl = document.getElementById('live-teams-tabs');
+  tabsEl.innerHTML = Object.values(teamPurch)
+    .sort((a,b) => (b.team.is_user ? 1 : 0) - (a.team.is_user ? 1 : 0) || a.team.id - b.team.id)
+    .map(({team, purchases, spent}) => {
+      const active = team.id === _liveTeamTabId ? ' active' : '';
+      const user = team.is_user ? ' user' : '';
+      return `<button class="lt-tab${active}${user}" onclick="showLiveTeam(${team.id})" title="${team.name}">
+        ${team.name}
+        <span class="lt-tab-count">${purchases.length}</span>
+        <span class="lt-tab-cr">${credits - spent}cr</span>
+      </button>`;
+    }).join('');
+
+  const active = teamPurch[_liveTeamTabId];
+  const body = document.getElementById('live-teams-body');
+  const remaining = credits - active.spent;
+  const byRole = {P:[], D:[], C:[], A:[]};
+  for (const p of active.purchases) {
+    const r = p.players?.role_classic;
+    if (byRole[r]) byRole[r].push(p);
+  }
+
+  const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0);
+  const roleLabels = {P:'Portieri', D:'Difensori', C:'Centrocampisti', A:'Attaccanti'};
+
+  let html = `<div class="lt-header" style="grid-column:1/-1;">
+    <div class="lt-title">${active.team.name} ${active.team.is_user?'<span style="color:var(--accent);font-size:.68rem;font-weight:700;margin-left:6px;padding:2px 6px;background:var(--accent-dim);border-radius:3px;">TU</span>':''}</div>
+    <div class="lt-spent">
+      Spesi: <strong>${active.spent}</strong>cr · Slot: ${active.purchases.length}/${totalSlots} · Rimasti: <span class="lt-remaining">${remaining}cr</span>
+    </div>
+  </div>`;
+
+  for (const r of ['P','D','C','A']) {
+    const slots = roles[r] || 0;
+    const filled = byRole[r].sort((a,b) => b.price - a.price);
+    const empty = Math.max(0, slots - filled.length);
+    const roleSpent = filled.reduce((a,p) => a + p.price, 0);
+    html += `<div class="lt-role-col">
+      <h4>${roleLabels[r]} <span><span class="lt-role-cr">${roleSpent}cr</span> · ${filled.length}/${slots}</span></h4>`;
+    for (const p of filled) {
+      html += `<div class="lt-slot filled" onclick="openPlayer(${p.player_id})" title="Apri scheda">
+        <span class="lt-slot-name"><strong>${p.players?.name || '?'}</strong> <span class="lt-slot-team">${p.players?.team || ''}</span></span>
+        <span class="lt-slot-price">${p.price}cr</span>
+      </div>`;
+    }
+    for (let i = 0; i < empty; i++) {
+      html += `<div class="lt-slot empty"><span class="lt-slot-name">Slot vuoto</span><span class="lt-slot-price" style="color:var(--text3);">—</span></div>`;
+    }
+    html += '</div>';
+  }
+  body.innerHTML = html;
 }
 
 function renderTeamPlayers(allPurch) {
@@ -4506,6 +4619,7 @@ async function refreshPurchases() {
   const userTeam = teamsCache.find(t => t.is_user);
   userSoldIds = new Set((purchases||[]).filter(p => p.team_id === userTeam?.id).map(p => p.player_id));
   checkSoldTargets();
+  renderLiveTeams(purchases || []);
   document.getElementById('purchases-log').innerHTML = (purchases||[]).map(p => `
     <tr>
       <td><strong>${p.players?.name||'?'}</strong></td>
