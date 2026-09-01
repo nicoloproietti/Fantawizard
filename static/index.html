@@ -1166,6 +1166,12 @@ a { color: var(--accent2); text-decoration: none; }
     <h3 onclick="toggleRigPanel()"><span>&#9917; Rigoristi</span> <span id="rig-toggle" style="font-size:.7rem;color:var(--text3);">&#9660;</span></h3>
     <div id="rig-content"></div>
   </div>
+
+  <!-- Portieri Panel -->
+  <div class="rig-panel" id="gk-panel" style="display:none;">
+    <h3 onclick="toggleGkPanel()"><span>&#129358; Portieri per solidit&agrave; difensiva</span> <span id="gk-toggle" style="font-size:.7rem;color:var(--text3);">&#9660;</span></h3>
+    <div id="gk-content"></div>
+  </div>
 </div>
 </div>
 
@@ -1176,8 +1182,10 @@ a { color: var(--accent2); text-decoration: none; }
       <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:4px;">Piano Asta</h2>
       <div style="font-size:.82rem;color:var(--text2);">Scegli i tuoi obiettivi per ruolo. Durante l'asta, il sistema ti avvisa quando un target o un suo equivalente viene chiamato.</div>
     </div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-sm" onclick="autoFillPlan()">Auto-genera piano</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn btn-sm" onclick="autoFillPlan('top')" title="Massimo FMA: concentra la spesa sui titoli top">Top &#128293;</button>
+      <button class="btn btn-sm" onclick="autoFillPlan('medio')" title="Bilanciato: distribuisce la spesa tra top e affidabili">Medio</button>
+      <button class="btn btn-sm" onclick="autoFillPlan('risparmio')" title="Basso costo: privilegia solidità e crediti per l'attacco">Risparmio &#128176;</button>
       <button class="btn-ghost btn-sm" onclick="clearPlan()">Svuota</button>
     </div>
   </div>
@@ -2364,6 +2372,7 @@ async function renderAnalytics() {
   renderTeamPlayers(allPurch);
   renderPhaseReport(allPurch);
   renderRigoristiPanel(seasonMap, tierData);
+  renderPortieriPanel(seasonMap, tierData);
 }
 
 function renderCreditsChart(allPurch) {
@@ -2701,6 +2710,144 @@ function renderPhaseContent(allPurch, role) {
     </div>`;
   }
   el.innerHTML = html;
+}
+
+// ── Portieri Panel: rank GKs by their team's defensive strength ──
+let _gkOpen = true;
+
+function toggleGkPanel() {
+  _gkOpen = !_gkOpen;
+  document.getElementById('gk-content').style.display = _gkOpen ? '' : 'none';
+  document.getElementById('gk-toggle').innerHTML = _gkOpen ? '&#9660;' : '&#9654;';
+}
+
+function renderPortieriPanel(seasonMap, tierData) {
+  const el = document.getElementById('gk-panel');
+  const contentEl = document.getElementById('gk-content');
+  if (!allPlayers.length || !allSeasons.length) { el.style.display = 'none'; return; }
+
+  const latestSeason = allSeasons.reduce((max, s) => s.season > max ? s.season : max, '');
+
+  // Team defensive strength: average goals-conceded per game across that team's
+  // GKs and their appearances weighted by minutes played (proxied by apps).
+  const teamDef = {};
+  for (const p of allPlayers) {
+    if (p.role_classic !== 'P') continue;
+    const ss = seasonMap[p.id] || [];
+    const rec = ss.find(s => s.season === latestSeason);
+    if (!rec || !(rec.appearances > 0)) continue;
+    if (!teamDef[p.team]) teamDef[p.team] = {gcTot: 0, csTot: 0, appsTot: 0, gks: []};
+    teamDef[p.team].gcTot += (rec.goals_conceded || 0);
+    // The DB has clean_sheets NULL for most rows; estimate when needed.
+    let cs = rec.clean_sheets || 0;
+    if (!cs && rec.appearances > 0) cs = estimateCleanSheets(rec.goals_conceded || 0, rec.appearances);
+    teamDef[p.team].csTot += cs;
+    teamDef[p.team].appsTot += rec.appearances;
+    teamDef[p.team].gks.push({p, apps: rec.appearances, gc: rec.goals_conceded || 0, cs, mv: rec.avg_rating || 0, fm: rec.fanta_avg || 0});
+  }
+
+  const teamRatings = {};
+  for (const [team, d] of Object.entries(teamDef)) {
+    if (d.appsTot === 0) continue;
+    teamRatings[team] = {
+      gcPerGame: d.gcTot / d.appsTot,
+      csRate: d.csTot / d.appsTot,
+      appsTot: d.appsTot,
+    };
+  }
+
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+
+  const rows = [];
+  for (const p of allPlayers) {
+    if (p.role_classic !== 'P' || !p.active) continue;
+    const ss = seasonMap[p.id] || [];
+    const rec = ss.find(s => s.season === latestSeason);
+    const teamRating = teamRatings[p.team];
+    const tier = getPlayerTier(p.id, 'P', tierData);
+    const rt = tierData['P'] || {};
+    const tl = (rt[tier]||[]).find(tp => tp.id === p.id);
+    const adjFma = tl ? tl.adjFma : projectFMA(p, ss);
+    const bp = basePrice(adjFma, 'P', credits, numTeams, totalSlots);
+    const scarcity = computeScarcity(tier, rt);
+    const mkt = scaleMarketPrice(p.avg_auction_price, credits);
+    const price = recommendedPrice(bp, 'P', tier, {}, scarcity, 999, mkt);
+    const isSold = soldIds.has(p.id);
+    const isTarget = Object.values(targetList).flat().some(t => t.playerId === p.id);
+    const apps = rec ? (rec.appearances || 0) : 0;
+    const gc = rec ? (rec.goals_conceded || 0) : 0;
+    let cs = rec ? (rec.clean_sheets || 0) : 0;
+    if (!cs && rec && rec.appearances > 0) cs = Math.round(estimateCleanSheets(gc, rec.appearances) * 10) / 10;
+
+    rows.push({
+      id: p.id, name: p.name, team: p.team,
+      apps, gc, cs, mv: rec?.avg_rating || 0, fm: rec?.fanta_avg || 0,
+      teamGcPerGame: teamRating ? teamRating.gcPerGame : null,
+      teamCsRate: teamRating ? teamRating.csRate : null,
+      tier, adjFma, price, isSold, isTarget,
+      noData: !rec || apps === 0,
+    });
+  }
+
+  // Rank by team defence: lowest gc/game and highest cs/game, tie-break on GK apps
+  rows.sort((a, b) => {
+    if (a.noData !== b.noData) return a.noData ? 1 : -1;
+    if (a.teamGcPerGame === null) return 1;
+    if (b.teamGcPerGame === null) return -1;
+    return a.teamGcPerGame - b.teamGcPerGame || b.apps - a.apps;
+  });
+
+  const free = rows.filter(r => !r.isSold && !r.noData);
+  if (!free.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+
+  const allTeamGc = Object.values(teamRatings).map(t => t.gcPerGame);
+  const minGc = Math.min(...allTeamGc), maxGc = Math.max(...allTeamGc);
+  const gcRange = maxGc - minGc || 1;
+
+  const summary = `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;font-size:.78rem;color:var(--text2);">
+    <span>Portieri disponibili: <strong style="color:var(--text);">${free.length}</strong></span>
+    <span>Miglior difesa: <strong style="color:var(--green);">${rows[0]?.team || '-'}</strong> (${rows[0]?.teamGcPerGame?.toFixed(2) || '-'} GS/gara)</span>
+    <span style="font-size:.7rem;color:var(--text3);">Ranking basato sui gol subiti / clean sheet della squadra nella stagione scorsa</span>
+  </div>`;
+
+  let tableHtml = `<table class="rig-table">
+    <thead><tr>
+      <th>Portiere</th><th>Squadra</th>
+      <th class="num">Pres</th><th class="num">GS totali</th>
+      <th class="num">CS</th><th class="num">GS/gara sq.</th>
+      <th class="num">FMA adj</th><th class="num">Prezzo</th><th>Stato</th>
+    </tr></thead><tbody>`;
+
+  for (const r of rows.slice(0, 40)) {
+    const rank = r.teamGcPerGame !== null ? 1 - ((r.teamGcPerGame - minGc) / gcRange) : 0;
+    const gcClr = rank >= 0.7 ? 'var(--green)' : rank >= 0.4 ? 'var(--yellow)' : 'var(--red)';
+    const statusHtml = r.isSold
+      ? '<span class="rig-avail sold">Venduto</span>'
+      : r.isTarget
+        ? '<span class="rig-avail free" style="background:rgba(100,100,255,.12);color:var(--accent);">Target</span>'
+        : r.noData ? '<span class="rig-avail sold" style="background:rgba(74,90,117,.12);color:var(--text3);">N/D</span>' : '<span class="rig-avail free">Libero</span>';
+    const rowCls = r.isSold ? ' style="opacity:.5;"' : '';
+    const barW = Math.round(rank * 60);
+
+    tableHtml += `<tr onclick="openPlayer(${r.id})"${rowCls}>
+      <td style="font-weight:600;">${r.name}</td>
+      <td style="color:var(--text2);">${r.team}</td>
+      <td class="num">${r.noData ? '-' : r.apps}</td>
+      <td class="num" style="color:${r.gc > 40 ? 'var(--red)' : r.gc > 25 ? 'var(--yellow)' : 'var(--green)'};">${r.noData ? '-' : r.gc}</td>
+      <td class="num" style="color:var(--green);">${r.noData ? '-' : r.cs}</td>
+      <td class="num">${r.teamGcPerGame !== null ? `<span class="rig-rate-bar" style="width:${barW}px;background:${gcClr};"></span><span style="color:${gcClr};font-weight:700;">${r.teamGcPerGame.toFixed(2)}</span>` : '-'}</td>
+      <td class="num" style="font-weight:700;color:var(--accent);">${r.adjFma}</td>
+      <td class="num" style="color:var(--green);font-weight:700;">${r.price}cr</td>
+      <td>${statusHtml}</td>
+    </tr>`;
+  }
+  tableHtml += '</tbody></table>';
+
+  contentEl.innerHTML = summary + tableHtml;
+  contentEl.style.display = _gkOpen ? '' : 'none';
 }
 
 // ── Rigoristi Panel ──
@@ -3084,7 +3231,7 @@ function normalizeBudgetSplits() {
   toast('Budget bilanciato al 100%', 'success');
 }
 
-function autoFillPlan() {
+function autoFillPlan(preset = 'medio') {
   if (!allPlayers.length) { toast('Carica prima i dati nella sezione Dati'); return; }
   if (!Object.keys(bonusMap).length) {
     for (const b of BONUS_DEFAULTS) { if (b.value !== 0) bonusMap[b.code] = b.value; }
@@ -3096,6 +3243,14 @@ function autoFillPlan() {
   const roles = Object.keys(rosterSlots).length ? rosterSlots : DEFAULT_ROLES;
   const totalSlots = Object.values(roles).reduce((a,b)=>a+b,0) || 25;
   const starters = getStartersNeeded();
+  // Preset shapes the objective: risk (concentrate on top attackers, cut defense/GK),
+  // saver (cap starter prices, invest savings on the attacker slot), medium (balanced).
+  const PRESETS = {
+    top:       {roleBias: {P: 0.55, D: 0.7, C: 0.9,  A: 1.35}, priceCap: 999, label: 'Top'},
+    medio:     {roleBias: {P: 1,    D: 1,   C: 1,    A: 1},    priceCap: 999, label: 'Medio'},
+    risparmio: {roleBias: {P: 0.7,  D: 0.85,C: 1,    A: 1.25}, priceCap: 999, label: 'Risparmio', discount: 0.85},
+  };
+  const cfg = PRESETS[preset] || PRESETS.medio;
   targetList = {};
 
   // Score every available player once: adjFma = projected fantamedia weighted
@@ -3128,7 +3283,9 @@ function autoFillPlan() {
   // adjFma-gained per credit-spent until no affordable upgrade remains.
   const nStartTot = Object.entries(roles).reduce((a,[r,c]) => a + Math.min(starters[r]||0, c), 0);
   const benchSlots = totalSlots - nStartTot;
-  const starterBudget = credits - benchSlots;
+  // Saver keeps ~15% of the budget aside for the bench, so cheap-but-active
+  // subs get real starter money instead of 1cr wagers.
+  const starterBudget = Math.round((credits - benchSlots) * (cfg.discount || 1));
   const chosen = {};
   const chosenIds = new Set();
   let spent = 0;
@@ -3143,10 +3300,11 @@ function autoFillPlan() {
     let best = null;
     for (const role of Object.keys(chosen)) {
       const cands = (byRole[role]||[]).filter(s => s.trusted).slice(0, CAND_LIMIT);
+      const bias = cfg.roleBias[role] || 1;
       for (const cand of cands) {
         if (chosenIds.has(cand.playerId)) continue;
         for (const cur of chosen[role]) {
-          const dScore = cand.adjFma - cur.adjFma;
+          const dScore = (cand.adjFma - cur.adjFma) * bias;
           if (dScore <= 0) continue;
           const dCost = cand.rec - cur.rec;
           if (spent + dCost > starterBudget) continue;
@@ -3189,7 +3347,7 @@ function autoFillPlan() {
   }
   savePlan();
   renderPlan();
-  toast(`Piano ottimizzato: FMA titolari ${Math.round(totalAdj*10)/10}, spesa prevista ~${spent + (totalSlots - nStartTot)}cr`, 'success');
+  toast(`Piano ${cfg.label}: FMA titolari ${Math.round(totalAdj*10)/10}, spesa prevista ~${spent + (totalSlots - nStartTot)}cr`, 'success');
 }
 
 function clearPlan() {
@@ -3908,9 +4066,9 @@ function svgRatingChart(seasons, height = 120) {
 
 function radarChart(stats, size = 140) {
   const n = stats.length;
-  const pad = size * 0.18;
+  const pad = size * 0.20;
   const full = size + pad * 2;
-  const cx = full / 2, cy = full / 2, r = size * 0.38;
+  const cx = full / 2, cy = full / 2, r = size * 0.42;
   const angleStep = (2 * Math.PI) / n;
   const startAngle = -Math.PI / 2;
   const pt = (i, pct) => {
@@ -3918,27 +4076,30 @@ function radarChart(stats, size = 140) {
     return [cx + r * pct * Math.cos(a), cy + r * pct * Math.sin(a)];
   };
   const gridLevels = [0.25, 0.5, 0.75, 1];
+  const dotR = Math.max(3, size * 0.022);
+  const valFs = Math.max(11, Math.round(size * 0.09));
+  const lblFs = Math.max(9, Math.round(size * 0.07));
   let svg = '';
   for (const lv of gridLevels) {
     const pts = stats.map((_, i) => pt(i, lv).join(',')).join(' ');
-    svg += `<polygon points="${pts}" fill="none" stroke="var(--border)" stroke-width="${lv===1?'1':'0.5'}" opacity="${lv===1?'.6':'.3'}"/>`;
+    svg += `<polygon points="${pts}" fill="none" stroke="var(--border)" stroke-width="${lv===1?'1.2':'0.7'}" opacity="${lv===1?'.7':'.35'}"/>`;
   }
   for (let i = 0; i < n; i++) {
     const [x, y] = pt(i, 1);
-    svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--border)" stroke-width="0.5" opacity=".3"/>`;
+    svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--border)" stroke-width="0.7" opacity=".35"/>`;
   }
   const dataPts = stats.map((s, i) => pt(i, Math.min(1, Math.max(0, s.value / (s.max || 1)))).join(',')).join(' ');
-  svg += `<polygon points="${dataPts}" fill="var(--accent)" fill-opacity=".15" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>`;
+  svg += `<polygon points="${dataPts}" fill="var(--accent)" fill-opacity=".18" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
   for (let i = 0; i < n; i++) {
     const pct = Math.min(1, Math.max(0, stats[i].value / (stats[i].max || 1)));
     const [dx, dy] = pt(i, pct);
-    svg += `<circle cx="${dx}" cy="${dy}" r="3" fill="var(--accent)" stroke="var(--bg)" stroke-width="1.5"/>`;
+    svg += `<circle cx="${dx}" cy="${dy}" r="${dotR}" fill="var(--accent)" stroke="var(--bg)" stroke-width="1.5"/>`;
     const [lx, ly] = pt(i, 1.22);
     const val = Number.isInteger(stats[i].value) ? stats[i].value : stats[i].value.toFixed(1);
-    svg += `<text x="${lx}" y="${ly - 5}" text-anchor="middle" fill="var(--text)" font-size="9" font-weight="700" font-family="Inter,system-ui">${val}</text>`;
-    svg += `<text x="${lx}" y="${ly + 5}" text-anchor="middle" fill="var(--text3)" font-size="7" font-family="Inter,system-ui">${stats[i].label}</text>`;
+    svg += `<text x="${lx}" y="${ly - lblFs*0.35}" text-anchor="middle" fill="var(--text)" font-size="${valFs}" font-weight="700" font-family="Inter,system-ui">${val}</text>`;
+    svg += `<text x="${lx}" y="${ly + valFs*0.85}" text-anchor="middle" fill="var(--text3)" font-size="${lblFs}" font-family="Inter,system-ui">${stats[i].label}</text>`;
   }
-  return `<svg viewBox="0 0 ${full} ${full}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:${size}px;">${svg}</svg>`;
+  return `<svg viewBox="0 0 ${full} ${full}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto;">${svg}</svg>`;
 }
 
 function playerRadarStats(player, seasonMap, targetSeason) {
@@ -4107,7 +4268,7 @@ async function openPlayer(id) {
     ${statsGridHtml}
     ${purchaseHtml}
     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
-      <div style="flex:0 0 auto;">${radarChart(playerRadarStats(pl, seasonMap, latestSeason), 160)}</div>
+      <div style="flex:0 0 auto;width:220px;max-width:100%;">${radarChart(playerRadarStats(pl, seasonMap, latestSeason), 220)}</div>
       <div style="flex:1;min-width:200px;">${gaugeHtml}</div>
     </div>
     <div class="chart-row">
@@ -4236,7 +4397,7 @@ async function openPlayer(id) {
           <span><span style="color:var(--text);font-weight:700;">Gol</span> gol</span>
           <span><span style="color:var(--text);font-weight:700;">Assist</span> assist</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;">
         ${similars.map(s => {
           const sp = s.player;
           const sss = seasonMap[sp.id] || [];
@@ -4263,7 +4424,7 @@ async function openPlayer(id) {
           const teamRepApps = teamRepAll.reduce((a, tp) => { const ts = seasonMap[tp.id] || []; const tr = ts.find(x => x.season === latestSeason); return a + (tr ? (tr.appearances || 0) : 0); }, 0);
           const shareRep = teamRepApps > 0 ? Math.round(apps / teamRepApps * 100) : 0;
           const teamAlts = teamRepAll.filter(p => p.id !== sp.id && !soldIds.has(p.id));
-          const bigRadar = radarChart(playerRadarStats(sp, seasonMap, latestSeason), 170);
+          const bigRadar = radarChart(playerRadarStats(sp, seasonMap, latestSeason), 240);
           const badge = isNoData
             ? '<span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(231,76,60,.15);color:var(--red);font-weight:700;" title="Nessun dato in Serie A la stagione scorsa">N/D</span>'
             : isPartial ? '<span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow);font-weight:700;" title="Meno di 19 presenze: campione ridotto">parziale</span>' : '';
