@@ -1443,6 +1443,14 @@ async function doAuth(kind) {
 }
 
 async function doLogout() {
+  // Wipe any cached plans stored under this user's namespace so the next
+  // login (or guest) doesn't see leftovers on the same browser.
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('fw_plan_')) localStorage.removeItem(k);
+    }
+  } catch(e) {}
   await sb.auth.signOut();
   currentUser = null;
   updateUserBtn();
@@ -3373,28 +3381,64 @@ function buildComparisonHtml(pl, topPl, topTierEntry, seasonMap, tierData) {
 }
 
 // ── Target Planning ──
+// The plan (targets, budget splits, formations) is scoped to the auction row
+// itself: because auctions carry owner_id and RLS filters on it, another user
+// on the same browser cannot see it even after logging in. We keep a
+// localStorage cache to render instantly, but the DB is the source of truth.
 function getPlanKey() {
-  return `fw_plan_${currentAuction || 'default'}`;
+  const uid = currentUser?.id || 'guest';
+  return `fw_plan_${uid}_${currentAuction || 'default'}`;
 }
 
-function loadPlan() {
+function loadPlanFromCache() {
   try {
-    const raw = localStorage.getItem(getPlanKey());
+    let raw = localStorage.getItem(getPlanKey());
+    // Fall back to the legacy key (pre-multi-account) so an existing plan is
+    // not lost on the first login. Migrate it to the new namespaced key.
+    if (!raw && currentAuction) {
+      const legacy = localStorage.getItem(`fw_plan_${currentAuction}`);
+      if (legacy) { raw = legacy; localStorage.setItem(getPlanKey(), legacy); }
+    }
     if (raw) {
       const data = JSON.parse(raw);
-      if (data.targets) {
+      if (data && data.targets) {
         targetList = data.targets;
         budgetSplits = data.splits || {};
         selectedFormations = data.formations || [];
-      } else { targetList = data; }
-      return;
+        return true;
+      }
     }
   } catch(e) {}
-  targetList = {};
+  return false;
 }
 
+function loadPlan() {
+  if (!loadPlanFromCache()) { targetList = {}; budgetSplits = {}; selectedFormations = []; }
+  if (currentAuction) {
+    // Fetch the authoritative copy from the DB; overwrites the cache if newer.
+    sb.from('auctions').select('plan_data').eq('id', currentAuction).single().then(({data, error}) => {
+      if (error || !data || !data.plan_data) return;
+      const p = data.plan_data;
+      if (p.targets) targetList = p.targets;
+      if (p.splits) budgetSplits = p.splits;
+      if (p.formations) selectedFormations = p.formations;
+      try { localStorage.setItem(getPlanKey(), JSON.stringify({targets: targetList, splits: budgetSplits, formations: selectedFormations})); } catch(e) {}
+      if (document.querySelector('#view-plan.active') || document.querySelector('#view-dashboard.active')) {
+        if (typeof renderPlanBody === 'function') renderPlanBody();
+      }
+    });
+  }
+}
+
+let _planSaveTimer = null;
 function savePlan() {
-  try { localStorage.setItem(getPlanKey(), JSON.stringify({targets: targetList, splits: budgetSplits, formations: selectedFormations})); } catch(e) {}
+  const payload = {targets: targetList, splits: budgetSplits, formations: selectedFormations};
+  try { localStorage.setItem(getPlanKey(), JSON.stringify(payload)); } catch(e) {}
+  if (!currentAuction) return;
+  clearTimeout(_planSaveTimer);
+  _planSaveTimer = setTimeout(() => {
+    sb.from('auctions').update({plan_data: payload}).eq('id', currentAuction).then(() => {});
+  }, 400);
 }
 
 function getStartersNeeded() {
