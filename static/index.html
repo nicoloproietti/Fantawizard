@@ -121,6 +121,10 @@ a { color: var(--accent2); text-decoration: none; }
 .topbar-credit input { width:52px; background:transparent; border:none; color:#2fc5ee; font-size:1rem; font-weight:800; font-family:var(--font); text-align:right; outline:none; padding:0; -moz-appearance:textfield; }
 .topbar-credit input::-webkit-outer-spin-button, .topbar-credit input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .topbar-credit-suffix { font-size:.72rem; color:#2fc5ee; font-weight:700; }
+.topbar-user { background:var(--bg3); border:1px solid var(--border2); color:var(--text); padding:6px 12px; border-radius:20px; cursor:pointer; font-size:.78rem; font-weight:600; font-family:var(--font); transition:all .12s; margin-left:8px; display:flex; align-items:center; gap:6px; }
+.topbar-user:hover { background:var(--bg4); border-color:var(--accent); }
+.topbar-user.logged { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.topbar-user::before { content:"\1F464"; font-size:.9rem; }
 .topbar-title {
   font-family: var(--font-display);
   font-size:1.15rem; font-weight:400; color:var(--text); letter-spacing:.04em; text-transform:uppercase;
@@ -1012,6 +1016,35 @@ a { color: var(--accent2); text-decoration: none; }
     <input id="credit-ref" type="number" min="100" max="5000" step="50" value="500">
     <span class="topbar-credit-suffix">cr</span>
   </div>
+  <button class="topbar-user" id="user-btn" onclick="openAuthModal()" title="Account"><span id="user-btn-label">Ospite</span></button>
+</div>
+
+<!-- Auth Modal -->
+<div class="modal" id="auth-modal">
+  <div class="modal-content" style="max-width:420px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;" id="auth-title">Accedi</h2>
+      <button onclick="closeAuthModal()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;font-family:var(--font);">&#x2715;</button>
+    </div>
+    <div id="auth-user-info" style="display:none;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:16px;font-size:.82rem;"></div>
+    <div id="auth-admin-panel" style="display:none;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:16px;">
+      <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--accent);">Crea account per un amico</div>
+      <div class="field"><label>Nickname</label><input id="admin-new-nick" placeholder="es. luca" maxlength="40"></div>
+      <div class="field"><label>Password (min 6)</label><input id="admin-new-pw" type="text" placeholder="password da inviare" maxlength="60"></div>
+      <div id="admin-err" style="color:var(--red);font-size:.78rem;margin-bottom:8px;display:none;"></div>
+      <button class="btn btn-sm" onclick="createFriendUser()" id="admin-create-btn">Crea account</button>
+      <div id="admin-users-list" style="margin-top:14px;font-size:.75rem;color:var(--text2);"></div>
+    </div>
+    <div id="auth-form">
+      <div style="font-size:.78rem;color:var(--text2);margin-bottom:14px;line-height:1.5;">Inserisci il nickname e la password che ti sono stati forniti. Ogni account ha le proprie aste private.</div>
+      <div class="field"><label>Nickname</label><input id="auth-nick" placeholder="es. luca" autocomplete="username" maxlength="40" onkeydown="if(event.key==='Enter')doAuth('signin')"></div>
+      <div class="field"><label>Password</label><input id="auth-pw" type="password" placeholder="password" autocomplete="current-password" maxlength="60" onkeydown="if(event.key==='Enter')doAuth('signin')"></div>
+      <div id="auth-error" style="color:var(--red);font-size:.78rem;margin-bottom:10px;display:none;"></div>
+      <button class="btn" style="width:100%;" onclick="doAuth('signin')" id="auth-signin-btn">Accedi</button>
+      <button id="auth-signup-btn" style="display:none;"></button>
+    </div>
+    <button class="btn-ghost" id="auth-logout-btn" style="display:none;width:100%;margin-top:12px;" onclick="doLogout()">Esci</button>
+  </div>
 </div>
 
 <div id="view-home" class="view active">
@@ -1284,6 +1317,150 @@ a { color: var(--accent2); text-decoration: none; }
 const SUPABASE_URL = 'https://mumlwqpdcwdwwtdmiaxk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11bWx3cXBkY3dkd3d0ZG1pYXhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MzQ3NjYsImV4cCI6MjEwMzExMDc2Nn0.NI6AUzBfqXQx7uh8gM2PhZPmZeB3m_-mQRMnh2fmjY4';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Auth (multi-account) ──
+// Nicknames are mapped to <nick>@fantawizard.local synthetic emails so we can
+// use Supabase Auth email/password without asking friends for real emails.
+const AUTH_EMAIL_DOMAIN = 'fantawizard.local';
+let currentUser = null;
+
+function nickToEmail(nick) {
+  return String(nick || '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '_') + '@' + AUTH_EMAIL_DOMAIN;
+}
+
+function emailToNick(email) {
+  return String(email || '').split('@')[0];
+}
+
+function updateUserBtn() {
+  const btn = document.getElementById('user-btn');
+  const label = document.getElementById('user-btn-label');
+  if (!btn) return;
+  if (currentUser) {
+    label.textContent = emailToNick(currentUser.email);
+    btn.classList.add('logged');
+  } else {
+    label.textContent = 'Ospite';
+    btn.classList.remove('logged');
+  }
+}
+
+function isAdminUser() {
+  return currentUser && currentUser.email === 'nicolo@fantawizard.local';
+}
+
+function openAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  const info = document.getElementById('auth-user-info');
+  const form = document.getElementById('auth-form');
+  const logout = document.getElementById('auth-logout-btn');
+  const title = document.getElementById('auth-title');
+  const err = document.getElementById('auth-error');
+  const adminPanel = document.getElementById('auth-admin-panel');
+  err.style.display = 'none'; err.textContent = '';
+  document.getElementById('admin-err').style.display = 'none';
+  if (currentUser) {
+    title.textContent = 'Account';
+    info.style.display = '';
+    info.innerHTML = `Sei loggato come <strong style="color:var(--accent);">${emailToNick(currentUser.email)}</strong>. Le tue aste sono separate dagli altri utenti.`;
+    form.style.display = 'none';
+    logout.style.display = '';
+    if (isAdminUser()) {
+      adminPanel.style.display = '';
+      loadFriendUsersList();
+    } else {
+      adminPanel.style.display = 'none';
+    }
+  } else {
+    title.textContent = 'Accedi';
+    info.style.display = 'none';
+    form.style.display = '';
+    logout.style.display = 'none';
+    adminPanel.style.display = 'none';
+    setTimeout(() => document.getElementById('auth-nick')?.focus(), 50);
+  }
+  modal.classList.add('open');
+}
+
+async function createFriendUser() {
+  const nick = document.getElementById('admin-new-nick').value.trim();
+  const pw = document.getElementById('admin-new-pw').value;
+  const err = document.getElementById('admin-err');
+  err.style.display = 'none';
+  const btn = document.getElementById('admin-create-btn');
+  btn.disabled = true;
+  try {
+    const {data, error} = await sb.rpc('create_friend_user', {p_nick: nick, p_password: pw});
+    if (error) { err.textContent = error.message; err.style.display = ''; return; }
+    document.getElementById('admin-new-nick').value = '';
+    document.getElementById('admin-new-pw').value = '';
+    toast(`Account "${data.nick}" creato. Manda al tuo amico: ${nick} + password`, 'success');
+    loadFriendUsersList();
+  } finally { btn.disabled = false; }
+}
+
+async function loadFriendUsersList() {
+  const el = document.getElementById('admin-users-list');
+  if (!el) return;
+  const {data, error} = await sb.rpc('list_friend_users');
+  if (error || !data) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="font-weight:700;margin-bottom:4px;color:var(--text3);text-transform:uppercase;font-size:.65rem;">Utenti registrati</div>' +
+    data.map(u => `<div style="padding:3px 0;">&#8226; <strong>${u.nick}</strong> <span style="color:var(--text3);">(${new Date(u.created_at).toLocaleDateString('it-IT')})</span></div>`).join('');
+}
+
+function closeAuthModal() {
+  document.getElementById('auth-modal').classList.remove('open');
+}
+
+async function doAuth(kind) {
+  const nick = document.getElementById('auth-nick').value.trim();
+  const pw = document.getElementById('auth-pw').value;
+  const err = document.getElementById('auth-error');
+  err.style.display = 'none';
+  if (!nick || !pw) { err.textContent = 'Nickname e password richiesti'; err.style.display = ''; return; }
+  if (pw.length < 6) { err.textContent = 'Password minimo 6 caratteri'; err.style.display = ''; return; }
+  const email = nickToEmail(nick);
+  const signinBtn = document.getElementById('auth-signin-btn');
+  const signupBtn = document.getElementById('auth-signup-btn');
+  signinBtn.disabled = signupBtn.disabled = true;
+  try {
+    let res;
+    if (kind === 'signup') res = await sb.auth.signUp({email, password: pw});
+    else res = await sb.auth.signInWithPassword({email, password: pw});
+    if (res.error) { err.textContent = res.error.message; err.style.display = ''; return; }
+    currentUser = res.data.user || res.data.session?.user || null;
+    if (!currentUser) { err.textContent = 'Verifica email pendente. Contatta l\'amministratore.'; err.style.display = ''; return; }
+    updateUserBtn();
+    closeAuthModal();
+    toast(kind === 'signup' ? `Account ${nick} creato!` : `Bentornato ${nick}`, 'success');
+    document.getElementById('auth-nick').value = '';
+    document.getElementById('auth-pw').value = '';
+    if (typeof loadAuctionsList === 'function') loadAuctionsList();
+    if (currentAuction) location.reload();
+  } finally {
+    signinBtn.disabled = signupBtn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  updateUserBtn();
+  closeAuthModal();
+  toast('Uscita effettuata', 'info');
+  currentAuction = null;
+  location.reload();
+}
+
+async function initAuth() {
+  const {data} = await sb.auth.getSession();
+  currentUser = data?.session?.user || null;
+  updateUserBtn();
+  sb.auth.onAuthStateChange((_evt, session) => {
+    currentUser = session?.user || null;
+    updateUserBtn();
+  });
+}
 
 let currentAuction = null;
 let auctionData = null;
@@ -3952,9 +4129,11 @@ async function createAuction() {
   const credits = parseInt(document.getElementById('s-credits').value) || 500;
   const matchdays = parseInt(document.getElementById('s-matchdays').value) || 38;
 
+  const ownerId = currentUser?.id || null;
   const {data: auction, error} = await sb.from('auctions').insert({
     name, mode, auction_type: atype, num_teams: numTeams,
-    initial_credits: credits, num_matchdays: matchdays
+    initial_credits: credits, num_matchdays: matchdays,
+    owner_id: ownerId,
   }).select().single();
   if (error) { toast('Errore: ' + error.message, 'error'); return; }
 
@@ -5434,6 +5613,7 @@ function checkFirstRun() {
 renderSetup();
 loadExistingAuctions();
 (async () => {
+  await initAuth();
   showLoading('Caricamento dati...');
   try {
     await loadAllData();
