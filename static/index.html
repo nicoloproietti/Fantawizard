@@ -3863,7 +3863,10 @@ function renderPlanBody() {
 }
 
 function renderPlan() {
-  loadPlan();
+  // Do NOT reload the plan here — addTarget/removeTarget mutate targetList in
+  // place and schedule a debounced save, so a mid-flight fetch from the DB
+  // would overwrite the fresh change with the stale copy. The plan is loaded
+  // once when the auction opens; any external device syncs on the next open.
   renderModules();
   renderBudgetSplits();
   renderPlanBody();
