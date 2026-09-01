@@ -116,15 +116,26 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .hamburger:hover { background: var(--bg3); }
 .hamburger svg { width:22px; height:22px; }
-.topbar-credit { display:flex; align-items:center; gap:6px; padding:5px 12px; background:rgba(47,197,238,.08); border:1.5px solid rgba(47,197,238,.4); border-radius:20px; margin-left:8px; }
-.topbar-credit-label { font-size:.62rem; letter-spacing:.08em; color:var(--text3); font-weight:700; text-transform:uppercase; }
-.topbar-credit input { width:52px; background:transparent; border:none; color:#2fc5ee; font-size:1rem; font-weight:800; font-family:var(--font); text-align:right; outline:none; padding:0; -moz-appearance:textfield; }
+.topbar-credit { display:flex; align-items:center; gap:4px; padding:4px 10px; background:rgba(47,197,238,.08); border:1.5px solid rgba(47,197,238,.4); border-radius:18px; margin-left:6px; flex-shrink:0; }
+.topbar-credit-label { font-size:.58rem; letter-spacing:.06em; color:var(--text3); font-weight:700; text-transform:uppercase; }
+.topbar-credit input { width:44px; background:transparent; border:none; color:#2fc5ee; font-size:.9rem; font-weight:800; font-family:var(--font); text-align:right; outline:none; padding:0; -moz-appearance:textfield; }
 .topbar-credit input::-webkit-outer-spin-button, .topbar-credit input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-.topbar-credit-suffix { font-size:.72rem; color:#2fc5ee; font-weight:700; }
-.topbar-user { background:var(--bg3); border:1px solid var(--border2); color:var(--text); padding:6px 12px; border-radius:20px; cursor:pointer; font-size:.78rem; font-weight:600; font-family:var(--font); transition:all .12s; margin-left:8px; display:flex; align-items:center; gap:6px; }
+.topbar-credit-suffix { font-size:.68rem; color:#2fc5ee; font-weight:700; }
+.topbar-user { background:var(--bg3); border:1px solid var(--border2); color:var(--text); padding:5px 10px; border-radius:18px; cursor:pointer; font-size:.75rem; font-weight:600; font-family:var(--font); transition:all .12s; margin-left:6px; display:flex; align-items:center; gap:5px; flex-shrink:0; white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis; }
 .topbar-user:hover { background:var(--bg4); border-color:var(--accent); }
 .topbar-user.logged { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
-.topbar-user::before { content:"\1F464"; font-size:.9rem; }
+.topbar-user::before { content:"\1F464"; font-size:.85rem; }
+@media (max-width:768px) {
+  .topbar-credit-label { display:none; }
+  .topbar-credit input { width:38px; }
+  #user-btn-label { display:none; }
+  .topbar-user { padding:5px 8px; }
+  #auction-indicator { font-size:.72rem !important; }
+}
+@media (max-width:520px) {
+  .topbar { padding:0 12px !important; gap:6px !important; }
+  #auction-indicator span:not(.badge) { display:none; }
+}
 .topbar-title {
   font-family: var(--font-display);
   font-size:1.15rem; font-weight:400; color:var(--text); letter-spacing:.04em; text-transform:uppercase;
@@ -997,7 +1008,7 @@ a { color: var(--accent2); text-decoration: none; }
   <nav id="nav">
     <button data-view="home" class="active"><span class="nav-icon">&#127968;</span>Home</button>
     <button data-view="setup"><span class="nav-icon">&#9881;</span>Setup</button>
-    <button data-view="data" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#128194;</span>Dati</button>
+    <button data-view="data" data-needs-auction="1" data-needs-admin="1" data-tooltip="Riservato all'amministratore"><span class="nav-icon">&#128194;</span>Dati</button>
     <button data-view="tiers"><span class="nav-icon">&#9776;</span>Tier List</button>
     <button data-view="plan" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#127919;</span>Piano Asta</button>
     <button data-view="dashboard" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#9889;</span>Asta Live</button>
@@ -1020,8 +1031,8 @@ a { color: var(--accent2); text-decoration: none; }
 </div>
 
 <!-- Auth Modal -->
-<div class="modal" id="auth-modal">
-  <div class="modal-content" style="max-width:420px;">
+<div class="modal-overlay" id="auth-modal" style="z-index:9500;">
+  <div class="modal" style="width:420px;max-width:95vw;padding:24px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <h2 style="margin:0;" id="auth-title">Accedi</h2>
       <button onclick="closeAuthModal()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;font-family:var(--font);">&#x2715;</button>
@@ -1343,6 +1354,7 @@ function updateUserBtn() {
     label.textContent = 'Ospite';
     btn.classList.remove('logged');
   }
+  if (typeof updateNavState === 'function') updateNavState();
 }
 
 function isAdminUser() {
@@ -1549,14 +1561,17 @@ function toggleSidebar() {
 
 function updateNavState() {
   const hasAuction = !!currentAuction;
+  const isAdmin = isAdminUser();
   document.querySelectorAll('#nav button[data-needs-auction]').forEach(btn => {
     btn.classList.toggle('nav-disabled', !hasAuction);
   });
-  if (!hasAuction) {
-    const activeBtn = document.querySelector('#nav button.active');
-    if (activeBtn && activeBtn.dataset.needsAuction) {
-      navigateTo('home');
-    }
+  document.querySelectorAll('#nav button[data-needs-admin]').forEach(btn => {
+    btn.style.display = isAdmin ? '' : 'none';
+  });
+  const activeBtn = document.querySelector('#nav button.active');
+  if (activeBtn) {
+    if (!hasAuction && activeBtn.dataset.needsAuction && !activeBtn.dataset.needsAdmin) navigateTo('home');
+    else if (!isAdmin && activeBtn.dataset.needsAdmin) navigateTo('home');
   }
   renderAuctionIndicator();
 }
