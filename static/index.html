@@ -116,6 +116,11 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .hamburger:hover { background: var(--bg3); }
 .hamburger svg { width:22px; height:22px; }
+.topbar-credit { display:flex; align-items:center; gap:6px; padding:5px 12px; background:rgba(47,197,238,.08); border:1.5px solid rgba(47,197,238,.4); border-radius:20px; margin-left:8px; }
+.topbar-credit-label { font-size:.62rem; letter-spacing:.08em; color:var(--text3); font-weight:700; text-transform:uppercase; }
+.topbar-credit input { width:52px; background:transparent; border:none; color:#2fc5ee; font-size:1rem; font-weight:800; font-family:var(--font); text-align:right; outline:none; padding:0; -moz-appearance:textfield; }
+.topbar-credit input::-webkit-outer-spin-button, .topbar-credit input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.topbar-credit-suffix { font-size:.72rem; color:#2fc5ee; font-weight:700; }
 .topbar-title {
   font-family: var(--font-display);
   font-size:1.15rem; font-weight:400; color:var(--text); letter-spacing:.04em; text-transform:uppercase;
@@ -1002,6 +1007,11 @@ a { color: var(--accent2); text-decoration: none; }
   </button>
   <span class="topbar-title" id="topbar-title">Home</span>
   <div id="auction-indicator" style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.82rem;"></div>
+  <div class="topbar-credit" title="Budget crediti per squadra (scala prezzi e piano)">
+    <span class="topbar-credit-label">CREDITI</span>
+    <input id="credit-ref" type="number" min="100" max="5000" step="50" value="500">
+    <span class="topbar-credit-suffix">cr</span>
+  </div>
 </div>
 
 <div id="view-home" class="view active">
@@ -1102,15 +1112,10 @@ a { color: var(--accent2); text-decoration: none; }
 
 <div id="view-dashboard" class="view">
 <div class="container">
-  <div style="display:flex;gap:10px;align-items:stretch;margin-bottom:16px;">
-    <div class="search-box" style="flex:1;">
+  <div style="margin-bottom:16px;">
+    <div class="search-box">
       <input id="player-search" placeholder="Cerca giocatore..." autocomplete="off">
       <div class="search-results" id="search-results"></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:4px;background:var(--bg2);border:2px solid var(--border2);border-radius:var(--radius-lg);padding:0 12px;white-space:nowrap;" title="Crediti totali per squadra. Usato per scalare i prezzi consigliati.">
-      <span style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;">Budget</span>
-      <input id="credit-ref" type="number" min="100" max="5000" step="50" value="500" style="width:58px;background:transparent;border:none;color:#2fc5ee;font-size:1rem;font-weight:700;font-family:var(--font);text-align:right;outline:none;">
-      <span style="color:var(--text3);font-size:.82rem;">cr</span>
     </div>
   </div>
 
@@ -1217,9 +1222,6 @@ a { color: var(--accent2); text-decoration: none; }
       <div style="font-size:.82rem;color:var(--text2);">Scegli i tuoi obiettivi per ruolo. Durante l'asta, il sistema ti avvisa quando un target o un suo equivalente viene chiamato.</div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-      <button class="btn btn-sm" onclick="autoFillPlan('top')" title="Massimo FMA: concentra la spesa sui titoli top">Top &#128293;</button>
-      <button class="btn btn-sm" onclick="autoFillPlan('medio')" title="Bilanciato: distribuisce la spesa tra top e affidabili">Medio</button>
-      <button class="btn btn-sm" onclick="autoFillPlan('risparmio')" title="Basso costo: privilegia solidità e crediti per l'attacco">Risparmio &#128176;</button>
       <button class="btn-ghost btn-sm" onclick="clearPlan()">Svuota</button>
     </div>
   </div>
@@ -3699,31 +3701,57 @@ function planSearch(role, q) {
     return {pl, adjFma, tier, rec, budgetFit};
   });
 
-  let items; let headerHtml = '';
   if (isSearch) {
-    items = scored.slice(0, 8);
-  } else {
-    if (!scored.length) { el.innerHTML = ''; return; }
-    headerHtml = `<div style="font-size:.72rem;color:var(--text3);padding:6px 12px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;">Consigliati per ~${avgTarget}cr</div>`;
-    items = scored
-      .filter(s => avgTarget === 0 || s.rec <= avgTarget * 1.5)
-      .sort((a,b) => (b.adjFma * 0.5 + b.budgetFit * 50) - (a.adjFma * 0.5 + a.budgetFit * 50))
-      .slice(0, 6);
+    const items = scored.slice(0, 8);
+    el.innerHTML = items.map(({pl, adjFma, tier, rec}) => {
+      const maxBid = Math.min(Math.max(rec, Math.min(avgTarget || rec, Math.round(rec * 1.3))), remaining > 0 ? remaining : rec);
+      return `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${maxBid});renderPlan();">
+        <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} &middot; F${tier}</span></span>
+        <span style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;">FMA ${adjFma} &middot; ~${rec}cr</span>
+      </div>`;
+    }).join('');
+    return;
   }
 
-  el.innerHTML = headerHtml + items.map(({pl, adjFma, tier, rec}) => {
-    const fits = rec <= avgTarget;
-    const fitClr = fits ? 'var(--green)' : rec <= avgTarget * 1.3 ? 'var(--yellow)' : 'var(--red)';
-    const fitIcon = fits ? '&#10003;' : rec <= avgTarget * 1.3 ? '&#9888;' : '&#10007;';
-    const maxBid = Math.min(Math.max(rec, Math.min(avgTarget, Math.round(rec * 1.5))), remaining > 0 ? remaining : rec);
-    return `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${maxBid});renderPlan();">
-      <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} &middot; F${tier}</span></span>
-      <span style="display:flex;align-items:center;gap:6px;">
-        <span style="color:var(--accent);font-weight:700;">FMA ${adjFma} &middot; ~${rec}cr</span>
-        <span style="font-size:.68rem;color:${fitClr};font-weight:600;" title="${fits?'Rientra nel budget target':'Sopra il target'}">${fitIcon}</span>
-      </span>
+  if (!scored.length) { el.innerHTML = ''; return; }
+
+  // Three price bands relative to the remaining role budget per slot.
+  // Anchor them to what the user can actually afford: top ~= 1.6x target,
+  // medio ~= target, risparmio <= 0.6x target.
+  const target = avgTarget > 0 ? avgTarget : Math.max(1, Math.round(remaining / Math.max(1, slotsLeft)));
+  const topMin = Math.round(target * 1.15);
+  const midMin = Math.round(target * 0.6), midMax = Math.round(target * 1.35);
+  const saveMax = Math.round(target * 0.6);
+  const affordable = remaining > 0 ? Math.max(1, remaining - Math.max(0, slotsLeft - 1)) : Infinity;
+
+  const bands = [
+    {key:'top', label:'Top', icon:'&#128293;', desc:`&gt;${topMin}cr`, filter: s => s.rec >= topMin && s.rec <= affordable, sort: (a,b) => b.adjFma - a.adjFma},
+    {key:'medio', label:'Medio', icon:'&#9878;', desc:`${midMin}-${midMax}cr`, filter: s => s.rec >= midMin && s.rec <= midMax && s.rec <= affordable, sort: (a,b) => b.adjFma - a.adjFma},
+    {key:'risparmio', label:'Risparmio', icon:'&#128176;', desc:`&lt;${saveMax}cr`, filter: s => s.rec <= saveMax, sort: (a,b) => b.adjFma - a.adjFma || a.rec - b.rec},
+  ];
+
+  let html = `<div style="font-size:.7rem;color:var(--text3);padding:6px 12px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;">Suggeriti in 3 fasce · budget slot ~${target}cr</div>`;
+  const seen = new Set();
+  for (const b of bands) {
+    const picks = scored.filter(b.filter).filter(s => !seen.has(s.pl.id)).sort(b.sort).slice(0, 3);
+    if (!picks.length) {
+      html += `<div style="padding:8px 12px;background:var(--bg3);font-size:.72rem;color:var(--text3);">${b.icon} <strong style="color:var(--text2);">${b.label}</strong> · nessun candidato in fascia ${b.desc}</div>`;
+      continue;
+    }
+    html += `<div style="padding:6px 12px;background:var(--bg3);font-size:.72rem;font-weight:700;color:var(--text2);display:flex;justify-content:space-between;align-items:center;">
+      <span>${b.icon} ${b.label}</span>
+      <span style="color:var(--text3);font-weight:400;">fascia ${b.desc}</span>
     </div>`;
-  }).join('');
+    for (const {pl, adjFma, tier, rec} of picks) {
+      seen.add(pl.id);
+      const maxBid = Math.min(Math.max(rec, Math.round(rec * 1.15)), remaining > 0 ? remaining : rec);
+      html += `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${maxBid});renderPlan();">
+        <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} &middot; F${tier}</span></span>
+        <span style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;">FMA ${adjFma} &middot; ~${rec}cr</span>
+      </div>`;
+    }
+  }
+  el.innerHTML = html;
 }
 
 function swapTarget(role, oldId, newId, maxPrice) {
