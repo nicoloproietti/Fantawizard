@@ -523,6 +523,10 @@ a { color: var(--accent2); text-decoration: none; }
 .tier-player:hover { background: var(--bg3); }
 .tier-player.sold { opacity:.25; text-decoration:line-through; }
 .tier-player .fma { color: var(--accent); font-weight: 700; font-variant-numeric:tabular-nums; }
+.tier-plan-btn { width:24px; height:24px; padding:0; border-radius:50%; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); cursor:pointer; font-size:.9rem; font-weight:700; line-height:1; display:inline-flex; align-items:center; justify-content:center; transition:all .12s; flex-shrink:0; }
+.tier-plan-btn:hover { background:var(--accent); border-color:var(--accent); color:#fff; transform:scale(1.1); }
+.tier-plan-btn.added { background:rgba(46,204,113,.18); border-color:var(--green); color:var(--green); cursor:default; }
+.tier-plan-btn.added:hover { background:rgba(46,204,113,.18); transform:none; }
 
 .upload-zone {
   border: 2px dashed var(--border2);
@@ -4948,6 +4952,32 @@ async function refreshBudget() {
 }
 
 // ── Tiers ──
+function addToPlanFromTier(role, playerId) {
+  const pl = allPlayers.find(p => p.id === playerId);
+  if (!pl) return;
+  if ((targetList[role] || []).find(t => t.playerId === playerId)) {
+    toast(`${pl.name} è già nel piano`, 'info');
+    return;
+  }
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  const tier = getPlayerTier(pl.id, role, tierData);
+  const rt = tierData[role] || {};
+  const ptd = (rt[tier]||[]).find(tp => tp.id === pl.id);
+  const adjFma = ptd ? ptd.adjFma : projectFMA(pl, seasonMap[pl.id]||[]);
+  const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
+  const sc = computeScarcity(tier, rt);
+  const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
+  const rec = Math.max(1, recommendedPrice(bp, role, tier, {}, sc, 999, mkt));
+  addTarget(role, playerId, rec);
+  const activeRole = document.querySelector('#tier-filter-bar button.active-filter')?.dataset.role;
+  if (activeRole) showTierRole(activeRole);
+  toast(`${pl.name} aggiunto al piano (~${rec}cr)`, 'success');
+}
+
 function showTierRole(role) {
   document.querySelectorAll('#tier-filter-bar button').forEach(b => {
     b.classList.toggle('active-filter', b.dataset.role === role);
@@ -4971,11 +5001,16 @@ function showTierRole(role) {
         const relPct = Math.round(p.reliability * 100);
         const relClr = relPct >= 90 ? 'var(--green)' : relPct >= 70 ? 'var(--yellow)' : 'var(--red)';
         const st = p.status || {label:'N/D', cls:'status-nd'};
+        const inPlan = !!(targetList[role] || []).find(t => t.playerId === p.id);
+        const planBtn = p.sold ? '' : (inPlan
+          ? `<button class="tier-plan-btn added" title="Gi&agrave; nel piano" onclick="event.stopPropagation();">&#10003;</button>`
+          : `<button class="tier-plan-btn" title="Aggiungi al piano asta" onclick="event.stopPropagation();addToPlanFromTier('${role}',${p.id})">+</button>`);
         return `<div class="tier-player ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
         <span>${p.name} <span style="color:var(--text2);font-size:.75rem;">${p.team}</span> <span class="status-badge ${st.cls}">${st.label}</span></span>
         <span style="display:flex;gap:8px;align-items:center;">
           <span title="${p.projected?'Affid. stimata':'Affidabilità'} ${relPct}% (pres. ${Math.round(p.lastApps||0)})" style="font-size:.65rem;color:${relClr};font-weight:600;">${relPct}%${p.projected?'*':''}</span>
           <span class="fma">${p.adjFma}</span>
+          ${planBtn}
         </span>
       </div>`;
       }).join('')}
