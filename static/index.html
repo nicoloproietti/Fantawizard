@@ -3944,10 +3944,20 @@ function planSearch(role, q) {
     return {pl, adjFma, tier, rec, budgetFit};
   });
 
+  // Anchor the max bid to the player's real value (recommended, never below
+  // the market price). Do NOT cap it to the role's remaining budget: two top
+  // strikers would otherwise get squeezed under their consigliato, which
+  // makes the plan useless. The 'Totale pianificato' bar warns when the sum
+  // goes over budget.
+  const initialMaxBid = (pl, rec) => {
+    const mkt = scaleMarketPrice(pl.avg_auction_price, credits) || 0;
+    return Math.max(1, Math.round(Math.max(rec, mkt)));
+  };
+
   if (isSearch) {
     const items = scored.slice(0, 8);
     el.innerHTML = items.map(({pl, adjFma, tier, rec}) => {
-      const maxBid = Math.min(Math.max(rec, Math.min(avgTarget || rec, Math.round(rec * 1.3))), remaining > 0 ? remaining : rec);
+      const maxBid = initialMaxBid(pl, rec);
       return `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${maxBid});renderPlan();">
         <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} &middot; F${tier}</span></span>
         <span style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;">FMA ${adjFma} &middot; ~${rec}cr</span>
@@ -3987,7 +3997,7 @@ function planSearch(role, q) {
     </div>`;
     for (const {pl, adjFma, tier, rec} of picks) {
       seen.add(pl.id);
-      const maxBid = Math.min(Math.max(rec, Math.round(rec * 1.15)), remaining > 0 ? remaining : rec);
+      const maxBid = initialMaxBid(pl, rec);
       html += `<div class="plan-sr-item" onclick="addTarget('${role}',${pl.id},${maxBid});renderPlan();">
         <span><strong>${pl.name}</strong> <span style="color:var(--text3);">${pl.team} &middot; F${tier}</span></span>
         <span style="color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;">FMA ${adjFma} &middot; ~${rec}cr</span>
@@ -4971,11 +4981,13 @@ function addToPlanFromTier(role, playerId) {
   const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
   const sc = computeScarcity(tier, rt);
   const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
-  const rec = Math.max(1, recommendedPrice(bp, role, tier, {}, sc, 999, mkt));
-  addTarget(role, playerId, rec);
+  const rec = recommendedPrice(bp, role, tier, {}, sc, 999, mkt);
+  // Never seed below the player's market value: the sum bar warns on overflow.
+  const maxBid = Math.max(1, Math.round(Math.max(rec, mkt || 0)));
+  addTarget(role, playerId, maxBid);
   const activeRole = document.querySelector('#tier-filter-bar button.active-filter')?.dataset.role;
   if (activeRole) showTierRole(activeRole);
-  toast(`${pl.name} aggiunto al piano (~${rec}cr)`, 'success');
+  toast(`${pl.name} aggiunto al piano (${maxBid}cr)`, 'success');
 }
 
 function showTierRole(role) {
