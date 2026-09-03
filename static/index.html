@@ -1109,7 +1109,10 @@ a { color: var(--accent2); text-decoration: none; }
       <div id="budget-splits" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
       <h2 style="margin-top:18px;">Nomi squadre</h2>
       <div id="team-names" style="display:flex;flex-direction:column;gap:6px;"></div>
-      <div style="margin-top:16px;"><button class="btn" onclick="createAuction()">Crea Asta</button></div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" id="save-auction-btn" onclick="saveAuctionSettings()" style="display:none;">Salva modifiche</button>
+        <button class="btn" id="create-auction-btn" onclick="createAuction()">Crea Asta</button>
+      </div>
       <div id="existing-auctions" style="margin-top:20px;"></div>
     </div>
     <div>
@@ -1642,6 +1645,8 @@ function closeAuction() {
     rosterSlots = {};
     document.getElementById('strategy-section').style.display = 'none';
     document.getElementById('analytics-section').style.display = 'none';
+    const saveBtn = document.getElementById('save-auction-btn'); if (saveBtn) saveBtn.style.display = 'none';
+    const createBtn = document.getElementById('create-auction-btn'); if (createBtn) createBtn.textContent = 'Crea Asta';
     updateNavState();
     renderHome();
     navigateTo('home');
@@ -4377,6 +4382,121 @@ async function createAuction() {
   await loadAuction(aId);
 }
 
+function populateSetupFromAuction(auction, bonus, mods, slots, splits, teams) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el != null && val != null) el.value = val; };
+  set('s-name', auction.name);
+  set('s-mode', auction.mode);
+  set('s-type', auction.auction_type);
+  set('s-teams', auction.num_teams);
+  set('s-credits', auction.initial_credits);
+  set('s-matchdays', auction.num_matchdays);
+
+  const slotByRole = {}; for (const s of slots) slotByRole[s.role] = s.count;
+  document.querySelectorAll('.roster-input').forEach(inp => {
+    if (slotByRole[inp.dataset.role] != null) inp.value = slotByRole[inp.dataset.role];
+  });
+
+  const splitByRole = {}; for (const s of splits) splitByRole[s.role] = s.percentage;
+  document.querySelectorAll('.budget-input').forEach(inp => {
+    if (splitByRole[inp.dataset.role] != null) inp.value = splitByRole[inp.dataset.role];
+  });
+
+  const bonusByCode = {}; for (const b of bonus) bonusByCode[b.code] = b;
+  document.querySelectorAll('.bonus-val').forEach(inp => {
+    const row = bonusByCode[inp.dataset.bonus];
+    if (row) inp.value = row.value;
+  });
+  document.querySelectorAll('.bonus-chk').forEach(chk => {
+    const row = bonusByCode[chk.dataset.bonusChk];
+    if (row) chk.checked = !!row.enabled;
+  });
+
+  const modByCode = {}; for (const m of mods) modByCode[m.code] = m;
+  document.querySelectorAll('.mod-chk').forEach(chk => {
+    const row = modByCode[chk.dataset.mod];
+    chk.checked = row ? !!row.enabled : false;
+  });
+
+  // Team names — re-render so the count and order match the DB
+  const container = document.getElementById('team-names');
+  const sorted = [...teams].sort((a,b) => (b.is_user?1:0) - (a.is_user?1:0) || a.id - b.id);
+  container.innerHTML = sorted.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <input type="text" class="team-name-input" data-idx="${i}" data-team-id="${t.id}" value="${t.name.replace(/"/g,'&quot;')}" style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border2);padding:8px 12px;border-radius:var(--radius-sm);font-size:.85rem;font-family:var(--font);">
+      ${t.is_user ? '<span style="font-size:.68rem;color:var(--accent);white-space:nowrap;font-weight:600;">TU</span>' : ''}
+    </div>`).join('');
+}
+
+async function saveAuctionSettings() {
+  if (!currentAuction) { toast('Nessuna asta attiva', 'error'); return; }
+  const aId = currentAuction;
+  const name = document.getElementById('s-name').value;
+  const mode = document.getElementById('s-mode').value;
+  const atype = document.getElementById('s-type').value;
+  const numTeams = parseInt(document.getElementById('s-teams').value) || 8;
+  const credits = parseInt(document.getElementById('s-credits').value) || 500;
+  const matchdays = parseInt(document.getElementById('s-matchdays').value) || 38;
+
+  const btn = document.getElementById('save-auction-btn');
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Salvataggio…';
+
+  try {
+    const {error: aErr} = await sb.from('auctions').update({
+      name, mode, auction_type: atype, num_teams: numTeams,
+      initial_credits: credits, num_matchdays: matchdays,
+    }).eq('id', aId);
+    if (aErr) throw aErr;
+
+    // Rebuild child config tables (delete + insert). Teams and purchases are
+    // NOT touched here (deleting teams would orphan purchases); team names
+    // are handled separately below.
+    const rs = [...document.querySelectorAll('.roster-input')].map(i => ({auction_id:aId, role:i.dataset.role, count:parseInt(i.value)||0}));
+    const br = [...document.querySelectorAll('.bonus-val')].map(i => {
+      const code = i.dataset.bonus;
+      const def = BONUS_DEFAULTS.find(d=>d.code===code);
+      return {
+        auction_id:aId, code, label:def.label, value:parseFloat(i.value)||0,
+        enabled: document.querySelector(`[data-bonus-chk="${code}"]`).checked,
+        roles: BONUS_ROLE_MAP[code]||'P,D,C,A', advanced: def.adv,
+      };
+    });
+    const mods = [...document.querySelectorAll('.mod-chk')].map(i => {
+      const def = MODIFIER_DEFAULTS.find(d=>d.code===i.dataset.mod);
+      return {auction_id:aId, code:i.dataset.mod, label:def.label, enabled:i.checked};
+    });
+    const bs = [...document.querySelectorAll('.budget-input')].map(i => ({auction_id:aId, role:i.dataset.role, percentage:parseFloat(i.value)||0}));
+
+    await Promise.all([
+      sb.from('roster_slots').delete().eq('auction_id', aId),
+      sb.from('bonus_rules').delete().eq('auction_id', aId),
+      sb.from('modifiers').delete().eq('auction_id', aId),
+      sb.from('budget_splits').delete().eq('auction_id', aId),
+    ]);
+    await Promise.all([
+      rs.length ? sb.from('roster_slots').insert(rs) : null,
+      br.length ? sb.from('bonus_rules').insert(br) : null,
+      mods.length ? sb.from('modifiers').insert(mods) : null,
+      bs.length ? sb.from('budget_splits').insert(bs) : null,
+    ].filter(Boolean));
+
+    // Team name updates (rows that carry a data-team-id are existing teams)
+    const teamUpdates = [...document.querySelectorAll('.team-name-input[data-team-id]')].map(inp => ({
+      id: parseInt(inp.dataset.teamId), name: inp.value.trim() || `Squadra ${parseInt(inp.dataset.idx)+1}`,
+    }));
+    for (const t of teamUpdates) {
+      await sb.from('teams').update({name: t.name}).eq('id', t.id);
+    }
+
+    // Reload the auction so in-memory state matches the DB
+    await loadAuction(aId);
+    toast('Modifiche salvate!', 'success');
+  } catch (e) {
+    toast('Errore salvataggio: ' + (e.message || e), 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
 async function loadAuction(id) {
   showLoading('Caricamento asta...');
   try {
@@ -4402,6 +4522,12 @@ async function loadAuction(id) {
     for (const s of (slots||[])) rosterSlots[s.role] = s.count;
     budgetSplits = {};
     for (const s of (splits||[])) budgetSplits[s.role] = s.percentage;
+
+    // Preload the setup form with the auction's saved values so the user
+    // sees what's currently active (and can tweak it via 'Salva modifiche').
+    populateSetupFromAuction(auction, bonus||[], mods||[], slots||[], splits||[], teams||[]);
+    document.getElementById('save-auction-btn').style.display = '';
+    document.getElementById('create-auction-btn').textContent = 'Crea nuova asta';
 
     await loadAllData();
     await loadAuctionPurchases();
