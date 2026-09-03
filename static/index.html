@@ -4593,7 +4593,14 @@ document.getElementById('player-search').addEventListener('keydown', (e) => {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.search-box')) { document.getElementById('search-results').classList.remove('open'); kbIdx = -1; }
 });
-document.getElementById('credit-ref').addEventListener('change', () => {
+document.getElementById('credit-ref').addEventListener('change', async () => {
+  const v = parseInt(document.getElementById('credit-ref').value) || 500;
+  // If an auction is loaded, persist the change so it follows the user on
+  // any device / after login on a fresh browser.
+  if (currentAuction && auctionData && v !== auctionData.initial_credits) {
+    auctionData.initial_credits = v;
+    await sb.from('auctions').update({initial_credits: v}).eq('id', currentAuction);
+  }
   if (document.getElementById('view-players').classList.contains('active')) renderPlayersDB();
 });
 
