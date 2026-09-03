@@ -843,6 +843,9 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
 .lt-slot-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:6px; }
 .lt-slot-team { color:var(--text3); font-size:.68rem; }
 .lt-slot-price { font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; flex-shrink:0; }
+.lt-slot-remove { display:none; margin-left:6px; background:none; border:none; color:var(--text3); cursor:pointer; font-size:.9rem; padding:0 4px; line-height:1; }
+.lt-slot.filled:hover .lt-slot-remove { display:inline-block; }
+.lt-slot-remove:hover { color:var(--red); }
 .lt-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:.82rem; }
 .lt-header .lt-title { font-weight:700; font-size:.95rem; }
 .lt-header .lt-spent { color:var(--text2); font-variant-numeric:tabular-nums; }
@@ -3301,6 +3304,7 @@ function renderLiveTeams(allPurch) {
       html += `<div class="lt-slot filled" onclick="openPlayer(${p.player_id})" title="Apri scheda">
         <span class="lt-slot-name"><strong>${p.players?.name || '?'}</strong> <span class="lt-slot-team">${p.players?.team || ''}</span></span>
         <span class="lt-slot-price">${p.price}cr</span>
+        <button class="lt-slot-remove" title="Annulla acquisto" onclick="event.stopPropagation();undoPurchase(${p.id}, ${p.player_id})">&#x2715;</button>
       </div>`;
     }
     for (let i = 0; i < empty; i++) {
@@ -5667,8 +5671,8 @@ async function refreshTeams() {
           <span style="color:var(--accent);font-weight:700;">${auctionData.initial_credits - spent}</span> rimasti · ${tp.length}/${totalSlots} slot
         </div>
       </div>
-      ${tp.length ? `<table class="log-table"><thead><tr><th>Giocatore</th><th>Ruolo</th><th>Prezzo</th></tr></thead><tbody>
-        ${tp.map(p => `<tr><td><strong>${p.players?.name||'?'}</strong></td><td>${p.players?.role_classic||''}</td><td style="font-weight:700;font-variant-numeric:tabular-nums;">${p.price}</td></tr>`).join('')}
+      ${tp.length ? `<table class="log-table"><thead><tr><th>Giocatore</th><th>Ruolo</th><th>Prezzo</th><th></th></tr></thead><tbody>
+        ${tp.map(p => `<tr><td style="cursor:pointer;" onclick="openPlayer(${p.player_id})"><strong>${p.players?.name||'?'}</strong></td><td>${p.players?.role_classic||''}</td><td style="font-weight:700;font-variant-numeric:tabular-nums;">${p.price}</td><td style="text-align:right;"><button class="undo-btn" title="Annulla acquisto" onclick="undoPurchase(${p.id}, ${p.player_id})">annulla</button></td></tr>`).join('')}
       </tbody></table>` : '<div style="color:var(--text3);font-size:.82rem;">Nessun acquisto</div>'}
     </div>
   `).join('');
