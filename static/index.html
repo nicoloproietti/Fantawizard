@@ -2135,8 +2135,10 @@ async function setCurrentPhase(role) {
   auctionData.current_phase = val;
   document.querySelectorAll('.phase-chip').forEach(b => b.classList.toggle('active', (b.dataset.phase || '') === (val || '')));
   await sb.from('auctions').update({current_phase: val}).eq('id', currentAuction);
-  // Refresh the watchlist / plan panels so the active role column gets highlighted
+  // Repaint everything that depends on the current phase: plan/watchlist
+  // columns (filter), supply/demand (fase corrente) and cascade/summary.
   renderWatchlistPanel();
+  if (typeof refreshStrategyPanel === 'function') refreshStrategyPanel();
 }
 
 const _panelOpen = { watchlist: true, planDash: true };
@@ -2850,12 +2852,19 @@ function renderSupplyDemand(allPurch) {
   const tierData = computeTiers(allPlayers, seasonMap);
   const roles = ['P','D','C','A'];
 
+  // Manual phase selection from the topbar chips wins; otherwise fall back to
+  // the first role that still has open slots across the whole league.
   let currentRole = null;
-  for (const r of roles) {
-    const slotsNeeded = rosterSlots[r] || 0;
-    const totalBought = allPurch.filter(p => { const pl = allPlayers.find(x => x.id === p.player_id); return pl && pl.role_classic === r; }).length;
-    const totalSlots = slotsNeeded * numTeams;
-    if (totalBought < totalSlots) { currentRole = r; break; }
+  const manualPhase = auctionData.current_phase;
+  if (manualPhase && roles.includes(manualPhase)) {
+    currentRole = manualPhase;
+  } else {
+    for (const r of roles) {
+      const slotsNeeded = rosterSlots[r] || 0;
+      const totalBought = allPurch.filter(p => { const pl = allPlayers.find(x => x.id === p.player_id); return pl && pl.role_classic === r; }).length;
+      const totalSlots = slotsNeeded * numTeams;
+      if (totalBought < totalSlots) { currentRole = r; break; }
+    }
   }
   if (!currentRole) { el.style.display = 'none'; return; }
 
