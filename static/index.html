@@ -1327,6 +1327,10 @@ a { color: var(--accent2); text-decoration: none; }
     </div>
     <input class="db-filter" id="db-search" placeholder="Cerca nome..." type="text">
     <select class="db-filter-select" id="db-team-filter"><option value="">Tutte le squadre</option></select>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text2);cursor:pointer;user-select:none;white-space:nowrap;">
+      <input type="checkbox" id="db-hide-sold" checked style="accent-color:var(--accent);width:15px;height:15px;">
+      Nascondi venduti
+    </label>
     <span class="db-count" id="db-count"></span>
   </div>
   <div class="db-table-wrap">
@@ -5583,6 +5587,7 @@ function renderPlayersDB() {
   if (dbRole !== 'ALL') filtered = filtered.filter(r => r.role_classic === dbRole);
   if (dbSearch) { const q = dbSearch.toLowerCase(); filtered = filtered.filter(r => r.name.toLowerCase().includes(q)); }
   if (dbTeam) filtered = filtered.filter(r => r.team === dbTeam);
+  if (document.getElementById('db-hide-sold')?.checked) filtered = filtered.filter(r => !r.sold);
 
   const col = DB_COLS.find(c => c.key === dbSort.col) || DB_COLS[3];
   filtered.sort((a,b) => {
@@ -5636,6 +5641,7 @@ document.getElementById('db-role-tabs').addEventListener('click', (e) => {
 });
 document.getElementById('db-search').addEventListener('input', (e) => { dbSearch = e.target.value.trim(); renderPlayersDB(); });
 document.getElementById('db-team-filter').addEventListener('change', (e) => { dbTeam = e.target.value; renderPlayersDB(); });
+document.getElementById('db-hide-sold').addEventListener('change', () => renderPlayersDB());
 document.getElementById('db-table').querySelector('thead').addEventListener('click', (e) => {
   const th = e.target.closest('th');
   if (!th || !th.dataset.col) return;
