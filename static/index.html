@@ -527,6 +527,9 @@ a { color: var(--accent2); text-decoration: none; }
 .tier-plan-btn:hover { background:var(--accent); border-color:var(--accent); color:#fff; transform:scale(1.1); }
 .tier-plan-btn.added { background:rgba(46,204,113,.18); border-color:var(--green); color:var(--green); cursor:default; }
 .tier-plan-btn.added:hover { background:rgba(46,204,113,.18); transform:none; }
+.tier-watch-btn { width:24px; height:24px; padding:0; border-radius:50%; border:1px solid var(--border2); background:var(--bg3); color:var(--text3); cursor:pointer; font-size:.75rem; line-height:1; display:inline-flex; align-items:center; justify-content:center; transition:all .12s; flex-shrink:0; }
+.tier-watch-btn:hover { background:var(--yellow); border-color:var(--yellow); color:#000; transform:scale(1.1); }
+.tier-watch-btn.watched { background:rgba(241,196,15,.18); border-color:var(--yellow); color:var(--yellow); }
 
 .upload-zone {
   border: 2px dashed var(--border2);
@@ -784,6 +787,21 @@ a { color: var(--accent2); text-decoration: none; }
 .lt-header .lt-spent { color:var(--text2); font-variant-numeric:tabular-nums; }
 .lt-header .lt-spent strong { color:var(--accent); font-weight:700; }
 .lt-header .lt-remaining { color:var(--green); font-weight:700; font-variant-numeric:tabular-nums; }
+
+/* ── Watchlist Panel ── */
+.watchlist-panel { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:16px; }
+.watchlist-header { display:flex; justify-content:space-between; align-items:baseline; font-size:.9rem; font-weight:700; margin-bottom:10px; gap:12px; flex-wrap:wrap; }
+.watchlist-body { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; }
+.wl-row { display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--bg3); border-radius:var(--radius-sm); font-size:.78rem; cursor:pointer; transition:background .1s; }
+.wl-row:hover { background:var(--bg4); }
+.wl-row.sold { opacity:.35; filter:blur(0.7px) grayscale(0.6); pointer-events:none; }
+.wl-row .wl-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.wl-row .wl-team { font-size:.66rem; color:var(--text3); font-weight:400; }
+.wl-row .wl-price { font-variant-numeric:tabular-nums; font-weight:700; color:var(--accent); font-size:.85rem; flex-shrink:0; }
+.wl-row .wl-role { font-size:.6rem; padding:1px 5px; border-radius:3px; background:var(--bg); flex-shrink:0; font-weight:700; }
+.wl-row .wl-remove { background:none; border:none; color:var(--text3); cursor:pointer; font-size:.9rem; padding:2px; }
+.wl-row .wl-remove:hover { color:var(--red); }
+.wl-empty { color:var(--text3); font-size:.78rem; text-align:center; padding:20px; grid-column:1/-1; }
 
 .strategy-panel { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
 @media(max-width:900px){ .strategy-panel{grid-template-columns:1fr;} }
@@ -1180,6 +1198,15 @@ a { color: var(--accent2); text-decoration: none; }
   <div class="live-teams-panel" id="live-teams-panel" style="display:none;">
     <div class="live-teams-tabs" id="live-teams-tabs"></div>
     <div class="live-teams-body" id="live-teams-body"></div>
+  </div>
+
+  <!-- Watchlist Panel -->
+  <div class="watchlist-panel" id="watchlist-panel" style="display:none;">
+    <div class="watchlist-header">
+      <div><span style="color:var(--yellow);">&#9733;</span> Watchlist <span id="watchlist-count" style="color:var(--text3);font-size:.72rem;font-weight:400;"></span></div>
+      <div style="font-size:.7rem;color:var(--text3);font-weight:400;">Giocatori da tenere sott'occhio: notifica se chiamati sotto il prezzo consigliato</div>
+    </div>
+    <div class="watchlist-body" id="watchlist-body"></div>
   </div>
 
   <div class="dash-top">
@@ -1957,6 +1984,107 @@ function computeMaxBid(auction, userPurchases) {
 let calledPlayer = null;
 let currentBid = 0;
 let targetList = {}; // {role: [{playerId, priority}]}
+let watchlist = new Set(); // player ids the user wants to be notified on
+
+async function loadWatchlist() {
+  watchlist = new Set();
+  if (!currentAuction) return;
+  const {data} = await sb.from('watchlist').select('player_id').eq('auction_id', currentAuction);
+  for (const r of (data || [])) watchlist.add(r.player_id);
+}
+
+async function toggleWatchlist(playerId) {
+  if (!currentAuction) { toast('Apri prima un\'asta', 'error'); return; }
+  const pl = allPlayers.find(p => p.id === playerId);
+  if (!pl) return;
+  if (watchlist.has(playerId)) {
+    watchlist.delete(playerId);
+    await sb.from('watchlist').delete().eq('auction_id', currentAuction).eq('player_id', playerId);
+    toast(`${pl.name} rimosso dai favoriti`, 'info');
+  } else {
+    watchlist.add(playerId);
+    await sb.from('watchlist').insert({auction_id: currentAuction, player_id: playerId, priority: 0});
+    toast(`${pl.name} aggiunto ai favoriti - riceverai un avviso se chiamato a buon prezzo`, 'success');
+  }
+  const activeRole = document.querySelector('#tier-filter-bar button.active-filter')?.dataset.role;
+  if (activeRole && document.getElementById('view-tiers').classList.contains('active')) showTierRole(activeRole);
+  renderWatchlistPanel();
+}
+
+function isInWatchlist(playerId) { return watchlist.has(playerId); }
+
+function renderWatchlistPanel() {
+  const panel = document.getElementById('watchlist-panel');
+  if (!panel) return;
+  if (!currentAuction || watchlist.size === 0) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const items = [];
+  for (const pid of watchlist) {
+    const pl = allPlayers.find(p => p.id === pid);
+    if (!pl) continue;
+    const fair = watchlistFairPrice(pid);
+    items.push({pl, fair, sold: soldIds.has(pid)});
+  }
+  items.sort((a, b) => (a.sold?1:0) - (b.sold?1:0) || (b.fair?.rec||0) - (a.fair?.rec||0));
+  document.getElementById('watchlist-count').textContent = `(${items.length})`;
+  const body = document.getElementById('watchlist-body');
+  if (!items.length) { body.innerHTML = '<div class="wl-empty">Nessun giocatore in watchlist</div>'; return; }
+  body.innerHTML = items.map(({pl, fair, sold}) => `
+    <div class="wl-row${sold?' sold':''}" onclick="openPlayer(${pl.id})">
+      <span class="wl-role" style="color:${ROLE_COLORS[pl.role_classic]||'var(--text)'};">${pl.role_classic}</span>
+      <span class="wl-name">${pl.name} <span class="wl-team">${pl.team}</span></span>
+      <span class="wl-price">~${fair?.rec||'-'}cr</span>
+      <button class="wl-remove" title="Rimuovi dai favoriti" onclick="event.stopPropagation();toggleWatchlist(${pl.id})">&#x2715;</button>
+    </div>
+  `).join('');
+}
+
+// When a watchlisted player is bought, tell the user how the price compared
+// to what the plan considered fair. If it went at a bargain and the user
+// didn't buy, that's the moment to know — for next similar player.
+function checkWatchlistPurchase(purchase, allPurchases) {
+  if (!purchase || !watchlist.has(purchase.player_id)) return;
+  const fair = watchlistFairPrice(purchase.player_id);
+  if (!fair) return;
+  const userTeam = teamsCache.find(t => t.is_user);
+  const boughtByUser = purchase.team_id === userTeam?.id;
+  const pl = allPlayers.find(p => p.id === purchase.player_id);
+  if (!pl) return;
+  const delta = purchase.price - fair.rec;
+  const bargain = delta <= -Math.max(3, Math.round(fair.rec * 0.15));
+  const overpay = delta >= Math.max(3, Math.round(fair.rec * 0.25));
+  if (boughtByUser) {
+    toast(`⭐ ${pl.name} preso a ${purchase.price}cr (consigliato ${fair.rec})`, bargain ? 'success' : overpay ? 'error' : 'info');
+  } else if (bargain) {
+    toast(`⚠ OCCASIONE PERSA: ${pl.name} a ${purchase.price}cr (consigliato ${fair.rec})`, 'error');
+  } else if (overpay) {
+    toast(`${pl.name} preso da altri a ${purchase.price}cr (sopra consigliato ${fair.rec})`, 'info');
+  } else {
+    toast(`${pl.name} preso da altri a ${purchase.price}cr (in linea con consigliato ${fair.rec})`, 'info');
+  }
+}
+
+// Compute the "fair" bid for a watchlisted player using the same pricing
+// pipeline used by the plan. Returns {rec, mkt, adjFma, tier, role}.
+function watchlistFairPrice(playerId) {
+  const pl = allPlayers.find(p => p.id === playerId);
+  if (!pl) return null;
+  const seasonMap = buildSeasonMap();
+  const tierData = computeTiers(allPlayers, seasonMap);
+  const credits = getActiveCredits();
+  const numTeams = auctionData?.num_teams || 10;
+  const totalSlots = Object.values(rosterSlots).reduce((a,b)=>a+b,0) || 25;
+  const role = pl.role_classic;
+  const tier = getPlayerTier(pl.id, role, tierData);
+  const rt = tierData[role] || {};
+  const ptd = (rt[tier]||[]).find(tp => tp.id === pl.id);
+  const adjFma = ptd ? ptd.adjFma : projectFMA(pl, seasonMap[pl.id]||[]);
+  const bp = basePrice(adjFma, role, credits, numTeams, totalSlots);
+  const sc = computeScarcity(tier, rt);
+  const mkt = scaleMarketPrice(pl.avg_auction_price, credits) || 0;
+  const rec = recommendedPrice(bp, role, tier, {}, sc, 999, mkt);
+  return {rec, mkt, adjFma, tier, role, name: pl.name, team: pl.team};
+}
 
 function computePriceRange(adjFma, role, tier, inflation, scarcity, maxBid, marketPrice) {
   const credits = getActiveCredits();
@@ -4277,7 +4405,9 @@ async function loadAuction(id) {
 
     await loadAllData();
     await loadAuctionPurchases();
+    await loadWatchlist();
     loadPlan();
+    renderWatchlistPanel();
     document.getElementById('strategy-section').style.display = '';
     updateNavState();
     loadExistingAuctions();
@@ -4669,7 +4799,7 @@ async function openPlayer(id) {
   document.getElementById('modal-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:start;">
       <div>
-        <h2>${pl.name} <span class="price-tag t${tier}" style="font-size:.75rem;vertical-align:middle;margin-left:8px;">F${tier}</span> <span class="status-badge ${playerStatus.cls}" style="font-size:.68rem;vertical-align:middle;margin-left:4px;">${playerStatus.label}</span></h2>
+        <h2>${pl.name} <span class="price-tag t${tier}" style="font-size:.75rem;vertical-align:middle;margin-left:8px;">F${tier}</span> <span class="status-badge ${playerStatus.cls}" style="font-size:.68rem;vertical-align:middle;margin-left:4px;">${playerStatus.label}</span> ${currentAuction ? `<button id="modal-watch-btn" title="${isInWatchlist(pl.id) ? 'Rimuovi dai favoriti' : 'Segui: notifica se chiamato a buon prezzo'}" onclick="toggleWatchlist(${pl.id});document.getElementById('modal-watch-btn').innerHTML=isInWatchlist(${pl.id})?'&#9733; Seguito':'&#9734; Segui'" style="background:${isInWatchlist(pl.id)?'rgba(241,196,15,.18)':'var(--bg3)'};border:1px solid ${isInWatchlist(pl.id)?'var(--yellow)':'var(--border2)'};color:${isInWatchlist(pl.id)?'var(--yellow)':'var(--text2)'};padding:3px 10px;border-radius:14px;cursor:pointer;font-size:.72rem;font-weight:700;vertical-align:middle;margin-left:8px;font-family:var(--font);">${isInWatchlist(pl.id) ? '&#9733; Seguito' : '&#9734; Segui'}</button>` : ''}</h2>
         <div class="subtitle">${pl.role_classic}${pl.role_mantra?' · '+pl.role_mantra:''} · ${pl.team} ${pl.is_penalty_taker?'· Rigorista':''}</div>
       </div>
       <button onclick="document.getElementById('player-modal').classList.remove('open')" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;font-family:var(--font);">&#x2715;</button>
@@ -4910,12 +5040,18 @@ async function refreshDashboard() {
 }
 
 async function refreshPurchases() {
+  const prevSold = soldIds;
   const {data: purchases} = await sb.from('purchases').select('*, players(name,team,role_classic), teams(name,is_user)').eq('auction_id', currentAuction).order('created_at', {ascending:false});
   soldIds = new Set((purchases||[]).map(p => p.player_id));
   const userTeam = teamsCache.find(t => t.is_user);
   userSoldIds = new Set((purchases||[]).filter(p => p.team_id === userTeam?.id).map(p => p.player_id));
+  // Notify on any newly-purchased watchlisted player (bargain / overpay / user pick)
+  for (const p of (purchases || [])) {
+    if (!prevSold || !prevSold.has(p.player_id)) checkWatchlistPurchase(p, purchases);
+  }
   checkSoldTargets();
   renderLiveTeams(purchases || []);
+  renderWatchlistPanel();
   document.getElementById('purchases-log').innerHTML = (purchases||[]).map(p => `
     <tr>
       <td><strong>${p.players?.name||'?'}</strong></td>
@@ -5030,11 +5166,14 @@ function showTierRole(role) {
         const planBtn = p.sold ? '' : (inPlan
           ? `<button class="tier-plan-btn added" title="Gi&agrave; nel piano" onclick="event.stopPropagation();">&#10003;</button>`
           : `<button class="tier-plan-btn" title="Aggiungi al piano asta" onclick="event.stopPropagation();addToPlanFromTier('${role}',${p.id})">+</button>`);
+        const watched = isInWatchlist(p.id);
+        const watchBtn = p.sold ? '' : `<button class="tier-watch-btn${watched?' watched':''}" title="${watched?'Rimuovi dai favoriti':'Segui questo giocatore (notifica se chiamato a buon prezzo)'}" onclick="event.stopPropagation();toggleWatchlist(${p.id})">${watched?'&#9733;':'&#9734;'}</button>`;
         return `<div class="tier-player ${p.sold?'sold':''}" onclick="${p.sold?'':'openPlayer('+p.id+')'}">
         <span>${p.name} <span style="color:var(--text2);font-size:.75rem;">${p.team}</span> <span class="status-badge ${st.cls}">${st.label}</span></span>
         <span style="display:flex;gap:8px;align-items:center;">
           <span title="${p.projected?'Affid. stimata':'Affidabilità'} ${relPct}% (pres. ${Math.round(p.lastApps||0)})" style="font-size:.65rem;color:${relClr};font-weight:600;">${relPct}%${p.projected?'*':''}</span>
           <span class="fma">${p.adjFma}</span>
+          ${watchBtn}
           ${planBtn}
         </span>
       </div>`;
