@@ -1645,8 +1645,7 @@ function closeAuction() {
     rosterSlots = {};
     document.getElementById('strategy-section').style.display = 'none';
     document.getElementById('analytics-section').style.display = 'none';
-    const saveBtn = document.getElementById('save-auction-btn'); if (saveBtn) saveBtn.style.display = 'none';
-    const createBtn = document.getElementById('create-auction-btn'); if (createBtn) createBtn.textContent = 'Crea Asta';
+    syncSetupButtons();
     updateNavState();
     renderHome();
     navigateTo('home');
@@ -1671,8 +1670,22 @@ document.querySelectorAll('#nav button').forEach(btn => {
     if (btn.dataset.view === 'teams' && currentAuction) refreshTeams();
     if (btn.dataset.view === 'players') renderPlayersDB();
     if (btn.dataset.view === 'plan') renderPlan();
+    if (btn.dataset.view === 'setup') syncSetupButtons();
   });
 });
+
+function syncSetupButtons() {
+  const saveBtn = document.getElementById('save-auction-btn');
+  const createBtn = document.getElementById('create-auction-btn');
+  if (!saveBtn || !createBtn) return;
+  if (currentAuction) {
+    saveBtn.style.display = '';
+    createBtn.textContent = 'Crea nuova asta';
+  } else {
+    saveBtn.style.display = 'none';
+    createBtn.textContent = 'Crea Asta';
+  }
+}
 
 // ── Pricing Engine (JS) ──
 const SEASON_WEIGHTS = [0.50, 0.30, 0.20];
@@ -4526,8 +4539,7 @@ async function loadAuction(id) {
     // Preload the setup form with the auction's saved values so the user
     // sees what's currently active (and can tweak it via 'Salva modifiche').
     populateSetupFromAuction(auction, bonus||[], mods||[], slots||[], splits||[], teams||[]);
-    document.getElementById('save-auction-btn').style.display = '';
-    document.getElementById('create-auction-btn').textContent = 'Crea nuova asta';
+    syncSetupButtons();
 
     await loadAllData();
     await loadAuctionPurchases();
