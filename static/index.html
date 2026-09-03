@@ -521,7 +521,7 @@ a { color: var(--accent2); text-decoration: none; }
 }
 .tier-player:last-child { border-bottom:none; }
 .tier-player:hover { background: var(--bg3); }
-.tier-player.sold { opacity:.25; text-decoration:line-through; }
+.tier-player.sold { opacity:.35; text-decoration:line-through; filter:blur(0.7px) grayscale(0.6); pointer-events:none; }
 .tier-player .fma { color: var(--accent); font-weight: 700; font-variant-numeric:tabular-nums; }
 .tier-plan-btn { width:24px; height:24px; padding:0; border-radius:50%; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); cursor:pointer; font-size:.9rem; font-weight:700; line-height:1; display:inline-flex; align-items:center; justify-content:center; transition:all .12s; flex-shrink:0; }
 .tier-plan-btn:hover { background:var(--accent); border-color:var(--accent); color:#fff; transform:scale(1.1); }
@@ -4292,8 +4292,21 @@ function subscribePurchases() {
   if (purchaseSub) { sb.removeChannel(purchaseSub); purchaseSub = null; }
   if (!currentAuction) return;
   purchaseSub = sb.channel('purchases-live')
-    .on('postgres_changes', {event:'*', schema:'public', table:'purchases', filter:`auction_id=eq.${currentAuction}`}, () => {
-      if (document.getElementById('view-dashboard').classList.contains('active')) refreshDashboard();
+    .on('postgres_changes', {event:'*', schema:'public', table:'purchases', filter:`auction_id=eq.${currentAuction}`}, async () => {
+      // Always refresh soldIds so views that read from it (tier list, plan
+      // suggestions, Piano B check) stay in sync in real time. Dashboard
+      // does the full refresh; other views trigger only what they show.
+      if (document.getElementById('view-dashboard').classList.contains('active')) {
+        refreshDashboard();
+      } else {
+        const {data: p} = await sb.from('purchases').select('player_id, team_id').eq('auction_id', currentAuction);
+        soldIds = new Set((p||[]).map(x => x.player_id));
+        const userTeam = teamsCache.find(t => t.is_user);
+        userSoldIds = new Set((p||[]).filter(x => x.team_id === userTeam?.id).map(x => x.player_id));
+        if (typeof checkSoldTargets === 'function') checkSoldTargets();
+        const activeRole = document.querySelector('#tier-filter-bar button.active-filter')?.dataset.role;
+        if (activeRole && document.getElementById('view-tiers').classList.contains('active')) showTierRole(activeRole);
+      }
     })
     .subscribe();
 }
