@@ -811,6 +811,13 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
 .lt-role-col h4 > span:first-child { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
 .lt-role-col h4 > span:last-child { flex-shrink:0; white-space:nowrap; display:inline-flex; align-items:center; gap:6px; font-variant-numeric:tabular-nums; }
 .lt-role-col h4 .lt-role-cr { color:var(--accent); font-weight:700; }
+.phase-chips { display:flex; gap:6px; flex-wrap:wrap; }
+.phase-chip { background:var(--bg3); border:1px solid var(--border2); color:var(--text2); padding:5px 12px; border-radius:16px; font-size:.75rem; font-weight:700; font-family:var(--font); cursor:pointer; transition:all .12s; }
+.phase-chip:hover { background:var(--bg4); border-color:var(--accent); color:var(--text); }
+.phase-chip.active { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 0 0 3px var(--accent-dim); }
+.wl-role-col.phase-active { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-dim); }
+.wl-role-col.phase-active h5 span:first-child { color:var(--accent) !important; }
+.wl-role-col.phase-dim { opacity:.5; }
 .lt-slot { display:flex; justify-content:space-between; align-items:center; padding:5px 6px; border-radius:4px; font-size:.78rem; transition:background .1s; }
 .lt-slot.filled { cursor:pointer; }
 .lt-slot.filled:hover { background:var(--bg4); }
@@ -2122,6 +2129,16 @@ async function toggleWatchlist(playerId) {
 
 function isInWatchlist(playerId) { return watchlist.has(playerId); }
 
+async function setCurrentPhase(role) {
+  if (!currentAuction || !auctionData) return;
+  const val = role || null;
+  auctionData.current_phase = val;
+  document.querySelectorAll('.phase-chip').forEach(b => b.classList.toggle('active', (b.dataset.phase || '') === (val || '')));
+  await sb.from('auctions').update({current_phase: val}).eq('id', currentAuction);
+  // Refresh the watchlist / plan panels so the active role column gets highlighted
+  renderWatchlistPanel();
+}
+
 const _panelOpen = { watchlist: true, planDash: true };
 function toggleWatchlistPanel() {
   _panelOpen.watchlist = !_panelOpen.watchlist;
@@ -2137,13 +2154,18 @@ function togglePlanDashPanel() {
 const ROLE_LABEL_FULL = {P:'Portieri', D:'Difensori', C:'Centrocampisti', A:'Attaccanti'};
 
 function renderRoleColumns(bodyEl, byRole, emptyMsg) {
-  const roles = ['P','D','C','A'];
+  const activePhase = auctionData?.current_phase || '';
+  // With an active phase we surface that role first and dim the others.
+  const roles = activePhase && ['P','D','C','A'].includes(activePhase)
+    ? [activePhase, ...['P','D','C','A'].filter(r => r !== activePhase)]
+    : ['P','D','C','A'];
   const total = roles.reduce((a,r) => a + (byRole[r]?.length || 0), 0);
   if (!total) { bodyEl.innerHTML = `<div class="wl-empty" style="grid-column:1/-1;">${emptyMsg}</div>`; return total; }
   bodyEl.innerHTML = roles.map(r => {
     const items = byRole[r] || [];
-    return `<div class="wl-role-col">
-      <h5><span style="color:${ROLE_COLORS[r]||'var(--text)'};">${ROLE_LABEL_FULL[r]}</span> <span class="wl-role-count">${items.length}</span></h5>
+    const cls = activePhase ? (r === activePhase ? ' phase-active' : ' phase-dim') : '';
+    return `<div class="wl-role-col${cls}">
+      <h5><span style="color:${ROLE_COLORS[r]||'var(--text)'};">${ROLE_LABEL_FULL[r]}${r === activePhase ? ' &#8226; in asta' : ''}</span> <span class="wl-role-count">${items.length}</span></h5>
       ${items.length ? items.map(it => it.html).join('') : '<div class="wl-role-empty">nessuno</div>'}
     </div>`;
   }).join('');
@@ -2659,9 +2681,19 @@ async function refreshStrategyPanel() {
 
   // Phase
   const phaseClr = phase.phase === 'inizio' ? 'var(--accent)' : phase.phase === 'meta' ? 'var(--yellow)' : 'var(--red)';
+  const cur = auctionData?.current_phase || '';
+  const phaseChip = (r, label) => `<button class="phase-chip${cur===r?' active':''}" data-phase="${r}" onclick="setCurrentPhase('${r}')">${label}</button>`;
   document.getElementById('auction-phase').innerHTML = `
     <div style="font-size:1.3rem;font-weight:800;color:${phaseClr};margin-bottom:6px;">${phase.label}</div>
-    <div style="font-size:.82rem;color:var(--text2);line-height:1.5;">${phase.detail}</div>`;
+    <div style="font-size:.82rem;color:var(--text2);line-height:1.5;margin-bottom:10px;">${phase.detail}</div>
+    <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Reparto in asta ora</div>
+    <div class="phase-chips">
+      ${phaseChip('P','Portieri')}
+      ${phaseChip('D','Difensori')}
+      ${phaseChip('C','Centrocampisti')}
+      ${phaseChip('A','Attaccanti')}
+      <button class="phase-chip${!cur?' active':''}" data-phase="" onclick="setCurrentPhase('')" title="Nessun reparto specifico">Auto</button>
+    </div>`;
 
   // Suggestion
   renderSuggestion(allPurch, opponents, needs);
