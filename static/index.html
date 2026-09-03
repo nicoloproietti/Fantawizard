@@ -187,6 +187,9 @@ a { color: var(--accent2); text-decoration: none; }
 .db-table .num-col { text-align:right; font-variant-numeric:tabular-nums; }
 .db-table th.num-col { text-align:right; }
 .db-count { font-size:.78rem; color:var(--text3); margin-left:auto; }
+.db-sold-btn { display:none; margin-left:6px; width:22px; height:22px; padding:0; border-radius:50%; border:1px solid var(--border2); background:var(--bg3); color:var(--text3); cursor:pointer; font-size:.7rem; line-height:1; vertical-align:middle; transition:all .12s; }
+tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content:center; }
+.db-sold-btn:hover { background:var(--red); border-color:var(--red); color:#fff; transform:scale(1.1); }
 
 .setup-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
 @media(max-width:800px){ .setup-grid{grid-template-columns:1fr;} }
@@ -5334,6 +5337,42 @@ async function refreshBudget() {
   document.getElementById('budget-display').innerHTML = html;
 }
 
+// ── Quick sold: mark a player as taken without picking a team ──
+// Uses a fake 'Altri' team created on demand for the current auction so the
+// purchases row can satisfy the NOT NULL team_id constraint. The player is
+// stamped at his scaled market price (FVM) or 1cr as fallback.
+async function ensureGenericSoldTeam() {
+  if (!currentAuction) return null;
+  let team = teamsCache.find(t => t.name === 'Altri' && !t.is_user);
+  if (team) return team;
+  const {data, error} = await sb.from('teams').insert({auction_id: currentAuction, name: 'Altri', is_user: false}).select().single();
+  if (error) { toast('Errore: ' + error.message, 'error'); return null; }
+  teamsCache.push(data);
+  return data;
+}
+
+async function quickSoldPlayer(playerId, evt) {
+  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+  if (!currentAuction) { toast('Apri prima un\'asta', 'error'); return; }
+  if (soldIds.has(playerId)) { toast('Già segnato come venduto', 'info'); return; }
+  const pl = allPlayers.find(p => p.id === playerId);
+  if (!pl) return;
+  const team = await ensureGenericSoldTeam();
+  if (!team) return;
+  const mkt = scaleMarketPrice(pl.avg_auction_price, getActiveCredits()) || pl.avg_auction_price || 1;
+  const {error} = await sb.from('purchases').insert({
+    auction_id: currentAuction, player_id: playerId, team_id: team.id, price: Math.max(1, Math.round(mkt)),
+  });
+  if (error) { toast('Errore: ' + error.message, 'error'); return; }
+  soldIds.add(playerId);
+  toast(`${pl.name} segnato come venduto`, 'success');
+  // Refresh whichever view is active
+  if (document.getElementById('view-players').classList.contains('active')) renderPlayersDB();
+  const activeRole = document.querySelector('#tier-filter-bar button.active-filter')?.dataset.role;
+  if (activeRole && document.getElementById('view-tiers').classList.contains('active')) showTierRole(activeRole);
+  if (document.getElementById('view-dashboard').classList.contains('active')) refreshDashboard();
+}
+
 // ── Tiers ──
 function addToPlanFromTier(role, playerId) {
   const pl = allPlayers.find(p => p.id === playerId);
@@ -5609,8 +5648,11 @@ function renderPlayersDB() {
     const tierCls = `t${r.tier}`;
     const relClr = r.reliability >= 90 ? 'var(--green)' : r.reliability >= 70 ? 'var(--yellow)' : 'var(--red)';
     const p1 = ' col-p1', p2 = ' col-p2';
+    const soldBtn = (currentAuction && !r.sold)
+      ? `<button class="db-sold-btn" title="Segna come venduto (senza scegliere squadra)" onclick="quickSoldPlayer(${r.id}, event)">&#10005;</button>`
+      : '';
     return `<tr onclick="openPlayer(${r.id})" class="${r.sold?'sold':''}">
-      <td class="player-name">${r.name} ${r.is_penalty_taker?'<span title="Rigorista" style="color:var(--yellow);">&#9917;</span>':''}</td>
+      <td class="player-name">${r.name} ${r.is_penalty_taker?'<span title="Rigorista" style="color:var(--yellow);">&#9917;</span>':''} ${soldBtn}</td>
       <td class="team-col${p2}">${r.team}</td>
       <td><span class="price-tag ${tierCls}" style="font-size:.7rem;padding:2px 8px;">${r.role_classic}</span></td>
       <td class="num-col${p2}" style="font-weight:700;color:var(--accent);">${r.fma}</td>
