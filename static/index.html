@@ -398,6 +398,24 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
+.sr-item .sr-detail-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: .9rem;
+  font-family: var(--font);
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .12s;
+  flex-shrink: 0;
+}
+.sr-item .sr-detail-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.1); }
 
 .modal-overlay {
   display: none;
@@ -4907,8 +4925,11 @@ function searchPlayers(q) {
     });
     results.sort((a,b) => b.adjFma - a.adjFma);
 
-    el.innerHTML = results.map(p => `
-      <div class="sr-item ${p.sold?'sold':''}" onclick="${p.sold?'':(currentAuction?'callPlayer('+p.id+')':'openPlayer('+p.id+')')}">
+    el.innerHTML = results.map(p => {
+      const primary = p.sold ? '' : (currentAuction ? `callPlayer(${p.id})` : `openPlayer(${p.id})`);
+      const detailBtn = p.sold ? '' : `<button class="sr-detail-btn" title="Apri scheda giocatore" onclick="event.stopPropagation();openPlayer(${p.id});document.getElementById('search-results').classList.remove('open');">&#8505;</button>`;
+      return `
+      <div class="sr-item ${p.sold?'sold':''}" onclick="${primary}">
         <div>
           <span class="name">${p.name}</span>
           <span class="meta">${p.role_classic} · ${p.team} ${p.is_penalty_taker?'⚽':''}${p.sold?' · VENDUTO':''}</span>
@@ -4917,9 +4938,10 @@ function searchPlayers(q) {
           <span class="price-tag t${p.tier}">F${p.tier}</span>
           ${p.mkt ? `<span style="font-size:.78rem;color:#2fc5ee;font-weight:600;font-variant-numeric:tabular-nums;" title="FVM originale: ${p.avg_auction_price} (${FVM_REF_CREDITS}cr)">${p.mkt}${p.mkt !== p.avg_auction_price ? '<span style="font-size:.62rem;color:var(--text3);font-weight:400;margin-left:2px;">(' + p.avg_auction_price + ')</span>' : ''}</span>` : ''}
           <span class="rec-price">${p.rec}</span>
+          ${detailBtn}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
     el.classList.add('open');
   };
 
