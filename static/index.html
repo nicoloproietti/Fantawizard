@@ -794,7 +794,14 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
 /* ── Watchlist Panel ── */
 .watchlist-panel { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:16px; }
 .watchlist-header { display:flex; justify-content:space-between; align-items:baseline; font-size:.9rem; font-weight:700; margin-bottom:10px; gap:12px; flex-wrap:wrap; }
-.watchlist-body { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; }
+.watchlist-body { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+.watchlist-panel.collapsed .watchlist-body { display:none; }
+.wl-role-col { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; }
+.wl-role-col h5 { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin:0 0 8px; color:var(--text3); display:flex; align-items:center; justify-content:space-between; }
+.wl-role-col h5 .wl-role-count { color:var(--text2); background:var(--bg); padding:1px 6px; border-radius:8px; font-weight:600; }
+.wl-role-col .wl-row { padding:6px 8px; background:var(--bg2); margin-bottom:4px; }
+.wl-role-col .wl-row:last-child { margin-bottom:0; }
+.wl-role-empty { font-size:.7rem; color:var(--text3); font-style:italic; text-align:center; padding:8px 0; }
 .wl-row { display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--bg3); border-radius:var(--radius-sm); font-size:.78rem; cursor:pointer; transition:background .1s; }
 .wl-row:hover { background:var(--bg4); }
 .wl-row.sold { opacity:.35; filter:blur(0.7px) grayscale(0.6); pointer-events:none; }
@@ -1207,13 +1214,22 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
     <div class="live-teams-body" id="live-teams-body"></div>
   </div>
 
-  <!-- Watchlist Panel -->
-  <div class="watchlist-panel" id="watchlist-panel" style="display:none;">
-    <div class="watchlist-header">
-      <div><span style="color:var(--yellow);">&#9733;</span> Watchlist <span id="watchlist-count" style="color:var(--text3);font-size:.72rem;font-weight:400;"></span></div>
-      <div style="font-size:.7rem;color:var(--text3);font-weight:400;">Giocatori da tenere sott'occhio: notifica se chiamati sotto il prezzo consigliato</div>
+  <!-- Watchlist Panel (collapsible, split by role) -->
+  <div class="watchlist-panel collapsible" id="watchlist-panel" style="display:none;">
+    <div class="watchlist-header" onclick="toggleWatchlistPanel()" style="cursor:pointer;user-select:none;">
+      <div><span id="watchlist-toggle" style="display:inline-block;width:14px;text-align:center;color:var(--text3);">&#9660;</span> <span style="color:var(--yellow);">&#9733;</span> Watchlist <span id="watchlist-count" style="color:var(--text3);font-size:.72rem;font-weight:400;"></span></div>
+      <div style="font-size:.7rem;color:var(--text3);font-weight:400;">Giocatori da tenere sott'occhio - notifica se chiamati sotto il prezzo consigliato</div>
     </div>
     <div class="watchlist-body" id="watchlist-body"></div>
+  </div>
+
+  <!-- Plan Panel (collapsible, split by role) -->
+  <div class="watchlist-panel collapsible" id="plan-dash-panel" style="display:none;">
+    <div class="watchlist-header" onclick="togglePlanDashPanel()" style="cursor:pointer;user-select:none;">
+      <div><span id="plan-dash-toggle" style="display:inline-block;width:14px;text-align:center;color:var(--text3);">&#9660;</span> <span style="color:var(--accent);">&#127919;</span> Piano Asta <span id="plan-dash-count" style="color:var(--text3);font-size:.72rem;font-weight:400;"></span></div>
+      <div style="font-size:.7rem;color:var(--text3);font-weight:400;">I tuoi target per ruolo con prezzo max pianificato</div>
+    </div>
+    <div class="watchlist-body" id="plan-dash-body"></div>
   </div>
 
   <div class="dash-top">
@@ -2050,38 +2066,96 @@ async function toggleWatchlist(playerId) {
 
 function isInWatchlist(playerId) { return watchlist.has(playerId); }
 
+const _panelOpen = { watchlist: true, planDash: true };
+function toggleWatchlistPanel() {
+  _panelOpen.watchlist = !_panelOpen.watchlist;
+  document.getElementById('watchlist-panel').classList.toggle('collapsed', !_panelOpen.watchlist);
+  document.getElementById('watchlist-toggle').innerHTML = _panelOpen.watchlist ? '&#9660;' : '&#9654;';
+}
+function togglePlanDashPanel() {
+  _panelOpen.planDash = !_panelOpen.planDash;
+  document.getElementById('plan-dash-panel').classList.toggle('collapsed', !_panelOpen.planDash);
+  document.getElementById('plan-dash-toggle').innerHTML = _panelOpen.planDash ? '&#9660;' : '&#9654;';
+}
+
+const ROLE_LABEL_FULL = {P:'Portieri', D:'Difensori', C:'Centrocampisti', A:'Attaccanti'};
+
+function renderRoleColumns(bodyEl, byRole, emptyMsg) {
+  const roles = ['P','D','C','A'];
+  const total = roles.reduce((a,r) => a + (byRole[r]?.length || 0), 0);
+  if (!total) { bodyEl.innerHTML = `<div class="wl-empty" style="grid-column:1/-1;">${emptyMsg}</div>`; return total; }
+  bodyEl.innerHTML = roles.map(r => {
+    const items = byRole[r] || [];
+    return `<div class="wl-role-col">
+      <h5><span style="color:${ROLE_COLORS[r]||'var(--text)'};">${ROLE_LABEL_FULL[r]}</span> <span class="wl-role-count">${items.length}</span></h5>
+      ${items.length ? items.map(it => it.html).join('') : '<div class="wl-role-empty">nessuno</div>'}
+    </div>`;
+  }).join('');
+  return total;
+}
+
 function renderWatchlistPanel() {
-  // Also render into the dedicated watchlist view if it exists.
   renderWatchlistView();
+  renderPlanDashPanel();
   const panel = document.getElementById('watchlist-panel');
   if (!panel) return;
   if (!currentAuction) { panel.style.display = 'none'; return; }
   panel.style.display = '';
-  const items = [];
+
+  const byRole = {P:[], D:[], C:[], A:[]};
+  let totalCount = 0;
   for (const pid of watchlist) {
     const pl = allPlayers.find(p => p.id === pid);
-    if (!pl) continue;
+    if (!pl || !byRole[pl.role_classic]) continue;
     const fair = watchlistFairPrice(pid);
-    items.push({pl, fair, sold: soldIds.has(pid)});
+    const sold = soldIds.has(pid);
+    totalCount++;
+    byRole[pl.role_classic].push({
+      sold,
+      rec: fair?.rec || 0,
+      html: `<div class="wl-row${sold?' sold':''}" onclick="openPlayer(${pl.id})">
+        <span class="wl-name">${pl.name} <span class="wl-team">${pl.team}</span></span>
+        <span class="wl-price">~${fair?.rec||'-'}cr</span>
+        <button class="wl-remove" title="Rimuovi dai favoriti" onclick="event.stopPropagation();toggleWatchlist(${pl.id})">&#x2715;</button>
+      </div>`,
+    });
   }
-  items.sort((a, b) => (a.sold?1:0) - (b.sold?1:0) || (b.fair?.rec||0) - (a.fair?.rec||0));
-  document.getElementById('watchlist-count').textContent = `(${items.length})`;
-  const body = document.getElementById('watchlist-body');
-  if (!items.length) {
-    body.innerHTML = `<div class="wl-empty">Nessun giocatore in watchlist ancora.<br>
-      Aggiungili dalla <a href="#" onclick="navigateTo('tiers');return false;" style="color:var(--accent);">Tier List</a> con la stella &#9734;
-      o aprendo la scheda di un giocatore e cliccando <strong>&#9734; Segui</strong>.<br>
-      Sarai avvisato quando un tuo osservato viene chiamato durante l'asta.</div>`;
-    return;
+  for (const r of ['P','D','C','A']) byRole[r].sort((a,b) => (a.sold?1:0)-(b.sold?1:0) || b.rec-a.rec);
+  document.getElementById('watchlist-count').textContent = `(${totalCount})`;
+  const emptyMsg = `Nessun giocatore in watchlist ancora. Aggiungili dalla <a href="#" onclick="navigateTo('tiers');return false;" style="color:var(--accent);">Tier List</a> con la stella &#9734; o dalla scheda di un giocatore cliccando <strong>&#9734; Segui</strong>.`;
+  renderRoleColumns(document.getElementById('watchlist-body'), byRole, emptyMsg);
+}
+
+function renderPlanDashPanel() {
+  const panel = document.getElementById('plan-dash-panel');
+  if (!panel) return;
+  if (!currentAuction) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const byRole = {P:[], D:[], C:[], A:[]};
+  let totalCount = 0;
+  for (const role of ['P','D','C','A']) {
+    for (const t of (targetList[role] || [])) {
+      const pl = allPlayers.find(p => p.id === t.playerId);
+      if (!pl) continue;
+      const sold = soldIds.has(pl.id);
+      const isUserSold = userSoldIds.has(pl.id);
+      totalCount++;
+      const soldTag = isUserSold ? '<span style="color:var(--green);font-size:.65rem;font-weight:700;">PRESO</span>' : sold ? '<span style="color:var(--red);font-size:.65rem;font-weight:700;">VENDUTO</span>' : '';
+      const starterTag = t.starter === true ? '<span style="color:var(--accent);font-size:.6rem;font-weight:700;background:var(--accent-dim);padding:0 4px;border-radius:3px;">TIT</span>' : '';
+      byRole[role].push({
+        sold,
+        maxPrice: t.maxPrice || 0,
+        html: `<div class="wl-row${sold?' sold':''}" onclick="openPlayer(${pl.id})">
+          <span class="wl-name">${pl.name} ${starterTag} <span class="wl-team">${pl.team}</span> ${soldTag}</span>
+          <span class="wl-price">max ${t.maxPrice||0}cr</span>
+        </div>`,
+      });
+    }
   }
-  body.innerHTML = items.map(({pl, fair, sold}) => `
-    <div class="wl-row${sold?' sold':''}" onclick="openPlayer(${pl.id})">
-      <span class="wl-role" style="color:${ROLE_COLORS[pl.role_classic]||'var(--text)'};">${pl.role_classic}</span>
-      <span class="wl-name">${pl.name} <span class="wl-team">${pl.team}</span></span>
-      <span class="wl-price">~${fair?.rec||'-'}cr</span>
-      <button class="wl-remove" title="Rimuovi dai favoriti" onclick="event.stopPropagation();toggleWatchlist(${pl.id})">&#x2715;</button>
-    </div>
-  `).join('');
+  for (const r of ['P','D','C','A']) byRole[r].sort((a,b) => (a.sold?1:0)-(b.sold?1:0) || b.maxPrice-a.maxPrice);
+  document.getElementById('plan-dash-count').textContent = `(${totalCount})`;
+  const emptyMsg = 'Nessun target ancora. Aggiungili dal <a href="#" onclick="navigateTo(\'plan\');return false;" style="color:var(--accent);">Piano Asta</a> o cliccando <strong>+</strong> sulla Tier List.';
+  renderRoleColumns(document.getElementById('plan-dash-body'), byRole, emptyMsg);
 }
 
 function renderWatchlistView() {
