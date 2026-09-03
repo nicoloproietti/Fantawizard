@@ -2543,7 +2543,7 @@ async function callPlayer(playerId) {
   panel.innerHTML = `
     <div class="call-header">
       <div>
-        <h2>${pl.name} <span class="call-role price-tag ${tierCls}">F${tier} · ${pl.role_classic}</span> <span class="status-badge ${playerStatus.cls}">${playerStatus.label}</span></h2>
+        <h2>${pl.name} <span class="call-role price-tag ${tierCls}">F${tier} · ${pl.role_classic}</span> <span class="status-badge ${playerStatus.cls}">${playerStatus.label}</span> <button class="sr-detail-btn call-info-btn" title="Apri scheda giocatore" onclick="openPlayer(${pl.id})" style="vertical-align:middle;margin-left:6px;width:30px;height:30px;font-size:1rem;">&#8505;</button></h2>
         <div style="color:var(--text2);font-size:.82rem;margin-top:2px;">${pl.team} ${pl.is_penalty_taker?'· &#9917; Rigorista':''} · ${isProjected?'Affid. stimata':'Affid.'} <span style="color:${relClr};font-weight:700;">${relPct}%</span>${roleNeed.remaining>0?' · <span style="color:var(--yellow);font-weight:600;">Ti serve questo ruolo ('+roleNeed.remaining+' slot)</span>':''}</div>
       </div>
       <button class="call-close" onclick="closeCallPanel()">&#x2715;</button>
