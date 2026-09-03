@@ -57,12 +57,14 @@ a { color: var(--accent2); text-decoration: none; }
   display: flex;
   flex-direction: column;
   transform: translateX(-100%);
-  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  transition: transform .25s cubic-bezier(.4,0,.2,1), width .2s ease;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .sidebar.open { transform: translateX(0); }
 .sidebar-brand {
-  padding: 22px 20px 18px;
+  position: relative;
+  padding: 22px 42px 18px 20px;
   font-family: var(--font-display);
   font-size: 1.7rem;
   font-weight: 400;
@@ -73,7 +75,36 @@ a { color: var(--accent2); text-decoration: none; }
   -webkit-text-fill-color: transparent;
   background-clip: text;
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.sidebar-collapse-btn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  transition: background .12s, color .12s;
+  z-index: 1;
+  -webkit-text-fill-color: var(--text2);
+}
+.sidebar-collapse-btn:hover { background: var(--accent); color: #fff; -webkit-text-fill-color: #fff; }
+.sidebar.collapsed { width: 64px; }
+.sidebar.collapsed .sidebar-brand { padding: 22px 0 18px; font-size: 1rem; text-align: center; }
+.sidebar.collapsed nav button { padding: 10px 0; justify-content: center; font-size: 0; }
+.sidebar.collapsed nav button .nav-icon { font-size: 1.2rem; margin: 0; }
+.sidebar.collapsed .sidebar-collapse-btn { position: static; transform: none; margin: 8px auto; display: flex; }
 .sidebar nav { display:flex; flex-direction:column; gap:2px; padding:14px 10px; flex:1; }
 .sidebar nav button {
   background: transparent;
@@ -774,9 +805,11 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
 .lt-tab .lt-tab-cr { font-size:.7rem; color:var(--text3); font-weight:400; font-variant-numeric:tabular-nums; }
 .lt-tab.active .lt-tab-cr { color:var(--accent); }
 .lt-tab .lt-tab-count { font-size:.7rem; color:var(--text3); font-variant-numeric:tabular-nums; padding:1px 5px; background:var(--bg); border-radius:8px; }
-.live-teams-body { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
-.lt-role-col { background:var(--bg3); border-radius:var(--radius-sm); padding:8px 10px; }
-.lt-role-col h4 { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; color:var(--text3); display:flex; justify-content:space-between; align-items:center; }
+.live-teams-body { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }
+.lt-role-col { background:var(--bg3); border-radius:var(--radius-sm); padding:10px 12px; min-width:0; }
+.lt-role-col h4 { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin:0 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); color:var(--text3); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.lt-role-col h4 > span:first-child { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
+.lt-role-col h4 > span:last-child { flex-shrink:0; white-space:nowrap; display:inline-flex; align-items:center; gap:6px; font-variant-numeric:tabular-nums; }
 .lt-role-col h4 .lt-role-cr { color:var(--accent); font-weight:700; }
 .lt-slot { display:flex; justify-content:space-between; align-items:center; padding:5px 6px; border-radius:4px; font-size:.78rem; transition:background .1s; }
 .lt-slot.filled { cursor:pointer; }
@@ -942,8 +975,12 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
   .sidebar { transform:translateX(0); }
   .sidebar-overlay { display:none !important; }
   .hamburger { display:none; }
-  .topbar { margin-left:230px; }
-  .view { margin-left:230px; }
+  .topbar { margin-left:230px; transition:margin-left .2s ease; }
+  .view { margin-left:230px; transition:margin-left .2s ease; }
+  .sidebar-collapse-btn { display:flex; }
+  .sidebar.collapsed ~ .topbar,
+  body.sidebar-collapsed .topbar { margin-left:64px; }
+  body.sidebar-collapsed .view { margin-left:64px; }
 }
 /* ── Responsive: DB table column priority ── */
 .db-table .col-p3 { } /* always visible */
@@ -1036,7 +1073,7 @@ tr:hover .db-sold-btn { display:inline-flex; align-items:center; justify-content
 </div>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="sidebar">
-  <div class="sidebar-brand">FantaWizard</div>
+  <div class="sidebar-brand">FantaWizard<button class="sidebar-collapse-btn" id="sidebar-collapse-btn" onclick="toggleSidebarCollapsed()" title="Collassa/espandi menu">&#10094;</button></div>
   <nav id="nav">
     <button data-view="home" class="active"><span class="nav-icon">&#127968;</span>Home</button>
     <button data-view="setup"><span class="nav-icon">&#9881;</span>Setup</button>
@@ -1626,6 +1663,25 @@ function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebar-overlay').classList.toggle('open');
 }
+
+function toggleSidebarCollapsed() {
+  const collapsed = document.body.classList.toggle('sidebar-collapsed');
+  document.getElementById('sidebar').classList.toggle('collapsed', collapsed);
+  document.getElementById('sidebar-collapse-btn').innerHTML = collapsed ? '&#10095;' : '&#10094;';
+  try { localStorage.setItem('fw_sidebar_collapsed', collapsed ? '1' : '0'); } catch(e) {}
+}
+
+// Restore sidebar state from localStorage
+try {
+  if (localStorage.getItem('fw_sidebar_collapsed') === '1') {
+    document.body.classList.add('sidebar-collapsed');
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('sidebar')?.classList.add('collapsed');
+      const btn = document.getElementById('sidebar-collapse-btn');
+      if (btn) btn.innerHTML = '&#10095;';
+    });
+  }
+} catch(e) {}
 
 function updateNavState() {
   const hasAuction = !!currentAuction;
