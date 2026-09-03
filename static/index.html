@@ -4170,10 +4170,10 @@ function planSearch(role, q) {
   // strikers would otherwise get squeezed under their consigliato, which
   // makes the plan useless. The 'Totale pianificato' bar warns when the sum
   // goes over budget.
-  const initialMaxBid = (pl, rec) => {
-    const mkt = scaleMarketPrice(pl.avg_auction_price, credits) || 0;
-    return Math.max(1, Math.round(Math.max(rec, mkt)));
-  };
+  // The plan always seeds the max bid at the recommended price (the pricing
+  // pipeline already blends analytical and market values). The user can raise
+  // it by hand if he wants to fight for a specific player.
+  const initialMaxBid = (_pl, rec) => Math.max(1, Math.round(rec));
 
   if (isSearch) {
     const items = scored.slice(0, 8);
@@ -5351,8 +5351,7 @@ function addToPlanFromTier(role, playerId) {
   const sc = computeScarcity(tier, rt);
   const mkt = scaleMarketPrice(pl.avg_auction_price, credits);
   const rec = recommendedPrice(bp, role, tier, {}, sc, 999, mkt);
-  // Never seed below the player's market value: the sum bar warns on overflow.
-  const maxBid = Math.max(1, Math.round(Math.max(rec, mkt || 0)));
+  const maxBid = Math.max(1, Math.round(rec));
   addTarget(role, playerId, maxBid);
   const activeRole = document.querySelector('#tier-filter-bar button.active-filter')?.dataset.role;
   if (activeRole) showTierRole(activeRole);
