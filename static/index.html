@@ -2333,7 +2333,9 @@ async function callPlayer(playerId) {
   const scarcity = computeScarcity(tier, roleTiers);
   const mkt = scaleMarketPrice(pl.avg_auction_price, getActiveCredits());
   const range = computePriceRange(adjFma, pl.role_classic, tier, infl, scarcity, mb, mkt);
-  currentBid = range.consigliato;
+  // Auctions start at 1 credit and go up. Seed the tracker at 1 so the user
+  // can type or step up the current bid live as it rises.
+  currentBid = 1;
 
   const opp = checkOpportunity(pl.id, seasonMap, tierData);
   const oppEl = document.getElementById('opp-alert');
@@ -2368,10 +2370,14 @@ async function callPlayer(playerId) {
       <div class="call-stat"><div class="val" style="color:var(--red);">${range.maxPush}</div><div class="lbl">Max spingi</div></div>
     </div>
     <div id="call-price-bar">${renderPriceBar(range, currentBid)}</div>
-    <div class="bid-tracker">
-      <button class="bid-btn" onclick="changeBid(-1)">-</button>
-      <div class="bid-display" id="bid-display" style="color:${signal.cls==='red'?'var(--red)':signal.cls==='yellow'?'var(--yellow)':'var(--green)'};">${currentBid}</div>
-      <button class="bid-btn" onclick="changeBid(1)">+</button>
+    <div class="bid-tracker" style="gap:6px;">
+      <button class="bid-btn" onclick="changeBid(-1)" title="-1">-</button>
+      <input type="number" id="bid-display" class="bid-display" value="${currentBid}" min="1" step="1"
+        style="color:${signal.cls==='red'?'var(--red)':signal.cls==='yellow'?'var(--yellow)':'var(--green)'};background:transparent;border:none;text-align:center;font-family:var(--font);outline:none;width:110px;padding:0;-moz-appearance:textfield;"
+        oninput="setBid(this.value)" onfocus="this.select()">
+      <button class="bid-btn" onclick="changeBid(1)" title="+1">+</button>
+      <button class="bid-btn" onclick="changeBid(5)" title="+5" style="font-size:.85rem;">+5</button>
+      <button class="bid-btn" onclick="changeBid(10)" title="+10" style="font-size:.85rem;">+10</button>
     </div>
     <div class="bid-signal ${signal.cls}" id="bid-signal">${signal.text}</div>
     <div class="call-actions">
@@ -2385,18 +2391,31 @@ async function callPlayer(playerId) {
   document.getElementById('player-search').value = '';
 }
 
-function changeBid(delta) {
+function changeBid(delta) { applyBid(currentBid + delta); }
+
+function setBid(raw) {
+  const v = parseInt(raw);
+  if (!Number.isFinite(v)) return;
+  applyBid(v);
+}
+
+function applyBid(v) {
   const panel = document.getElementById('call-panel');
   const range = JSON.parse(panel.dataset.range);
   const mb = parseInt(panel.dataset.maxBid) || 999;
-  currentBid = Math.max(1, Math.min(currentBid + delta, mb));
+  currentBid = Math.max(1, Math.min(v|0, mb));
   const signal = getBidSignal(currentBid, range);
   const clr = signal.cls === 'red' ? 'var(--red)' : signal.cls === 'yellow' ? 'var(--yellow)' : 'var(--green)';
-  document.getElementById('bid-display').textContent = currentBid;
-  document.getElementById('bid-display').style.color = clr;
+  const inp = document.getElementById('bid-display');
+  if (inp && document.activeElement !== inp) inp.value = currentBid;
+  else if (inp && parseInt(inp.value) !== currentBid) inp.value = currentBid;
+  if (inp) inp.style.color = clr;
   document.getElementById('bid-signal').className = `bid-signal ${signal.cls}`;
   document.getElementById('bid-signal').textContent = signal.text;
   document.getElementById('call-price-bar').innerHTML = renderPriceBar(range, currentBid);
+  // Keep the 'Assegna ad altro' price input in sync too
+  const ap = document.getElementById('assign-price');
+  if (ap && document.activeElement !== ap) ap.value = currentBid;
 }
 
 function quickBuy() {
