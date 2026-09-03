@@ -1035,6 +1035,7 @@ a { color: var(--accent2); text-decoration: none; }
     <button data-view="plan" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#127919;</span>Piano Asta</button>
     <button data-view="dashboard" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#9889;</span>Asta Live</button>
     <button data-view="teams" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#128101;</span>Rose</button>
+    <button data-view="watchlist" data-needs-auction="1" data-tooltip="Apri o crea un'asta prima"><span class="nav-icon">&#9733;</span>Watchlist</button>
     <button data-view="players"><span class="nav-icon">&#9917;</span>Giocatori</button>
   </nav>
 </aside>
@@ -1355,6 +1356,16 @@ a { color: var(--accent2); text-decoration: none; }
 </div>
 </div>
 
+<div id="view-watchlist" class="view">
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+    <h2 style="margin:0;"><span style="color:var(--yellow);">&#9733;</span> Watchlist <span id="watchlist-view-count" style="color:var(--text3);font-size:.72rem;font-weight:400;">0</span></h2>
+    <div style="font-size:.78rem;color:var(--text2);">Giocatori da tenere sott'occhio - notifica in tempo reale se chiamati a buon prezzo</div>
+  </div>
+  <div id="watchlist-view-body"></div>
+</div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1586,7 +1597,7 @@ function confirmDialog(title, message, confirmLabel, onConfirm) {
 }
 
 // ── Navigation ──
-const VIEW_TITLES = {home:'Home',dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',data:'Dati',setup:'Setup'};
+const VIEW_TITLES = {home:'Home',dashboard:'Asta Live',plan:'Piano Asta',players:'Giocatori',tiers:'Tier List',teams:'Rose',watchlist:'Watchlist',data:'Dati',setup:'Setup'};
 const AUCTION_VIEWS = ['dashboard','plan','teams','data'];
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -1671,6 +1682,7 @@ document.querySelectorAll('#nav button').forEach(btn => {
     if (btn.dataset.view === 'players') renderPlayersDB();
     if (btn.dataset.view === 'plan') renderPlan();
     if (btn.dataset.view === 'setup') syncSetupButtons();
+    if (btn.dataset.view === 'watchlist') renderWatchlistView();
   });
 });
 
@@ -2032,9 +2044,11 @@ async function toggleWatchlist(playerId) {
 function isInWatchlist(playerId) { return watchlist.has(playerId); }
 
 function renderWatchlistPanel() {
+  // Also render into the dedicated watchlist view if it exists.
+  renderWatchlistView();
   const panel = document.getElementById('watchlist-panel');
   if (!panel) return;
-  if (!currentAuction || watchlist.size === 0) { panel.style.display = 'none'; return; }
+  if (!currentAuction) { panel.style.display = 'none'; return; }
   panel.style.display = '';
   const items = [];
   for (const pid of watchlist) {
@@ -2046,7 +2060,13 @@ function renderWatchlistPanel() {
   items.sort((a, b) => (a.sold?1:0) - (b.sold?1:0) || (b.fair?.rec||0) - (a.fair?.rec||0));
   document.getElementById('watchlist-count').textContent = `(${items.length})`;
   const body = document.getElementById('watchlist-body');
-  if (!items.length) { body.innerHTML = '<div class="wl-empty">Nessun giocatore in watchlist</div>'; return; }
+  if (!items.length) {
+    body.innerHTML = `<div class="wl-empty">Nessun giocatore in watchlist ancora.<br>
+      Aggiungili dalla <a href="#" onclick="navigateTo('tiers');return false;" style="color:var(--accent);">Tier List</a> con la stella &#9734;
+      o aprendo la scheda di un giocatore e cliccando <strong>&#9734; Segui</strong>.<br>
+      Sarai avvisato quando un tuo osservato viene chiamato durante l'asta.</div>`;
+    return;
+  }
   body.innerHTML = items.map(({pl, fair, sold}) => `
     <div class="wl-row${sold?' sold':''}" onclick="openPlayer(${pl.id})">
       <span class="wl-role" style="color:${ROLE_COLORS[pl.role_classic]||'var(--text)'};">${pl.role_classic}</span>
@@ -2055,6 +2075,42 @@ function renderWatchlistPanel() {
       <button class="wl-remove" title="Rimuovi dai favoriti" onclick="event.stopPropagation();toggleWatchlist(${pl.id})">&#x2715;</button>
     </div>
   `).join('');
+}
+
+function renderWatchlistView() {
+  const el = document.getElementById('watchlist-view-body');
+  if (!el) return;
+  if (!currentAuction) {
+    el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:40px;">Apri prima un\'asta dalla sezione Setup.</div>';
+    return;
+  }
+  const items = [];
+  for (const pid of watchlist) {
+    const pl = allPlayers.find(p => p.id === pid);
+    if (!pl) continue;
+    const fair = watchlistFairPrice(pid);
+    items.push({pl, fair, sold: soldIds.has(pid)});
+  }
+  items.sort((a, b) => (a.sold?1:0) - (b.sold?1:0) || (b.fair?.rec||0) - (a.fair?.rec||0));
+  document.getElementById('watchlist-view-count').textContent = items.length;
+  if (!items.length) {
+    el.innerHTML = `<div style="color:var(--text2);text-align:center;padding:40px;line-height:1.7;">
+      Nessun giocatore in watchlist ancora.<br>
+      Aggiungili dalla <a href="#" onclick="navigateTo('tiers');return false;" style="color:var(--accent);font-weight:700;">Tier List</a>
+      con la stella <span style="color:var(--yellow);">&#9734;</span>
+      o dalla scheda di un giocatore cliccando <strong>&#9734; Segui</strong>.<br>
+      Durante l'asta sarai avvisato quando un tuo osservato viene chiamato a buon prezzo.</div>`;
+    return;
+  }
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">
+    ${items.map(({pl, fair, sold}) => `
+      <div class="wl-row${sold?' sold':''}" onclick="openPlayer(${pl.id})" style="padding:12px 14px;">
+        <span class="wl-role" style="color:${ROLE_COLORS[pl.role_classic]||'var(--text)'};">${pl.role_classic}</span>
+        <span class="wl-name">${pl.name} <span class="wl-team">${pl.team}</span></span>
+        <span class="wl-price">~${fair?.rec||'-'}cr</span>
+        <button class="wl-remove" title="Rimuovi dai favoriti" onclick="event.stopPropagation();toggleWatchlist(${pl.id})">&#x2715;</button>
+      </div>`).join('')}
+  </div>`;
 }
 
 // When a watchlisted player is bought, tell the user how the price compared
